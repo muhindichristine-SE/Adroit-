@@ -1552,7 +1552,7 @@ async function exportPDF() {
   const cover = getCoverData(p);
   const docNo = cover.docNo || ''; const inspNum = cover.inspectionNo || ''; const docTitle = `Site Inspection ${inspNum} Report`; const issuePages = Math.ceil(p.issues.length / 2) || 1; const totalPages = 2 + issuePages; const cleanLogo = LOGO_DATA;
 
-  function addLogo(x, y, w, h) { const logoAspect = 4.4; const logoH = h || (w / logoAspect); try { doc.addImage(cleanLogo, 'JPEG', x, y, w, logoH, '', 'FAST'); } catch(e) { /* logo optional */ } }
+  function addLogo(x, y, w, h) { const logoAspect = 4.4; const logoH = h || (w / logoAspect); try { doc.addImage(cleanLogo, 'JPEG', x, y, w, logoH, 'logo', 'FAST'); } catch(e) { /* logo optional */ } }
 
   function footerOnPage(pageNum) {
     doc.setFontSize(7.5); doc.setTextColor(160,160,160);
@@ -1806,6 +1806,7 @@ async function exportPDF() {
 
   for (let i = 0; i < p.issues.length; i++) {
     const iss = p.issues[i];
+    try {
     const slotIndex = i % 2;
 
     // New page every 2 issues (not on first)
@@ -1839,7 +1840,11 @@ async function exportPDF() {
     // Photo left — large and clear
     if (iss.annotations || iss.photo) {
       try {
-        doc.addImage(iss.annotations||iss.photo, 'JPEG', M, photoY, PHOTO_W, PHOTO_H);
+        var _imgData = iss.annotations||iss.photo;
+        var _imgType = _imgData && _imgData.indexOf('image/png') !== -1 ? 'PNG'
+                     : _imgData && _imgData.indexOf('image/webp') !== -1 ? 'WEBP'
+                     : 'JPEG';
+        doc.addImage(_imgData, _imgType, M, photoY, PHOTO_W, PHOTO_H);
       } catch(e) {
         doc.setFillColor(230,230,230); doc.rect(M, photoY, PHOTO_W, PHOTO_H, 'F');
         doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(150,150,150);
@@ -1859,7 +1864,7 @@ async function exportPDF() {
     if (iss.aiSummary) {
       const aiY = photoY + 6 + Math.min(descLines.length, 10) * 4.5 + 3;
       doc.setFont('helvetica','italic'); doc.setFontSize(8); doc.setTextColor(26,42,94);
-      doc.text(doc.splitTextToSize('✦ ' + iss.aiSummary, DESC_W), DESC_X, aiY);
+      doc.text(doc.splitTextToSize('>> ' + iss.aiSummary, DESC_W), DESC_X, aiY);
     }
 
     // Meta row — sits below photo, light purple line above
@@ -1875,6 +1880,7 @@ async function exportPDF() {
       doc.setTextColor(130,130,130);
       doc.text(`GPS: ${iss.gps.lat}, ${iss.gps.lng}`, W-M, metaY + 5, {align:'right'});
     }
+    } catch(issErr) { console.warn('Issue ' + i + ' render error:', issErr.message || issErr); }
   }
 
   footerOnPage(currentPage);
