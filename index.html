@@ -1401,19 +1401,14 @@ function stopRecording() {
   document.getElementById('micBtn').classList.remove('recording'); document.getElementById('micBtn').textContent = '🎤';
   document.getElementById('voiceState').textContent = 'Done — edit or save'; document.getElementById('voiceState').classList.remove('live');
   const txt = document.getElementById('issueDesc').value.trim();
-  if (txt.length > 15) generateAISummary(txt);
+  // AI summary disabled on static hosting — no backend proxy available.
 }
 async function generateAISummary(txt) {
-  const sec = document.getElementById('aiSection'); const aiTxt = document.getElementById('aiText'); const aiLoad = document.getElementById('aiLoading');
-  sec.style.display = 'block'; aiTxt.textContent = ''; aiLoad.style.display = 'flex';
-  try {
-    const res = await fetch(HH_API, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000,
-        system: 'You are a structural engineering inspection assistant for Adroit BIM Consultants Consulting Engineers. Convert voice notes into concise professional inspection observations. Use imperative technical language. Maximum 2 sentences. No preamble.',
-        messages: [{ role: 'user', content: `Convert to professional inspection note: "${txt}"` }] }) });
-    const data = await res.json();
-    aiLoad.style.display = 'none'; aiTxt.textContent = data.content?.[0]?.text?.trim() || '';
-  } catch(e) { aiLoad.style.display = 'none'; sec.style.display = 'none'; }
+  // AI summary requires a server-side proxy with an Anthropic API key.
+  // When hosted on GitHub Pages (no backend), this feature is unavailable —
+  // hide the section silently so the rest of the issue form works normally.
+  const sec = document.getElementById('aiSection');
+  if (sec) sec.style.display = 'none';
 }
 async function saveIssue() {
   const title = document.getElementById('issueTitle').value.trim() || 'Untitled Issue';
@@ -1560,26 +1555,143 @@ async function exportPDF() {
     doc.text(`Page ${pageNum} of ${totalPages}`, W-M, 290, {align:'right'});
   }
 
-  // ─── PAGE 1: COVER ───────────────────────────────────────
-  doc.setDrawColor(61, 44, 141);
-  doc.setLineWidth(0.3);
-  for (let i = 0; i < 38; i++) { doc.line(12, 30 + i * 7, 22, 30 + i * 7); }
+  // ─── PAGE 1: COVER (matches adroit_cover_v4 design) ────────────────────────────
+  const PW = 210, PH = 297;
 
-  addLogo(90, 12, 105, 22);
+  // Background
+  doc.setFillColor(249, 248, 245);
+  doc.rect(0, 0, PW, PH, 'F');
 
+  // Left navy sidebar (5% of width ≈ 10.5mm)
+  const SB = 10.5;
+  doc.setFillColor(26, 42, 94);
+  doc.rect(0, 0, SB, PH, 'F');
+
+  // Sidebar red accent line (top)
+  doc.setFillColor(139, 28, 28);
+  doc.rect(SB * 0.225, 14, SB * 0.55, 0.6, 'F');
+
+  // Sidebar bottom dot
+  doc.setFillColor(139, 28, 28);
+  doc.circle(SB / 2, PH - 10, 1.2, 'F');
+
+  // Sidebar vertical text (rotated) — ADR · SIN · 2026 · 017
+  doc.saveGraphicsState();
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(cover.docNo || 'ADR · SIN · 2026', SB / 2, PH / 2, { align: 'center', angle: 90 });
+  doc.restoreGraphicsState();
+
+  // Top crimson rule (full width after sidebar)
+  doc.setFillColor(139, 28, 28);
+  doc.rect(SB, 0, PW - SB, 3, 'F');
+
+  // Corner marks (top-left, bottom-right)
+  const CM = 7, CMO = 8;
+  doc.setDrawColor(26, 42, 94); doc.setLineWidth(0.3);
+  doc.line(SB + CMO, CMO, SB + CMO + CM, CMO);        // TL horiz
+  doc.line(SB + CMO, CMO, SB + CMO, CMO + CM);        // TL vert
+  doc.line(PW - CMO - CM, PH - CMO, PW - CMO, PH - CMO); // BR horiz
+  doc.line(PW - CMO, PH - CMO - CM, PW - CMO, PH - CMO); // BR vert
+
+  // Arch watermark (SVG path approximated as jsPDF bezier curves) — centred, very faint
+  doc.saveGraphicsState();
+  doc.setGState(new doc.GState({ opacity: 0.06 }));
+  doc.setFillColor(26, 42, 94);
+  // Scale factor: SVG viewBox 680×560 → ~110mm wide centred
+  const AS = 110 / 680, AX = SB + (PW - SB) / 2 - 55, AY = PH * 0.28;
+  // Outer arch shape using lines (simplified but recognisable)
+  const archPts = [
+    [340,60],[292,75],[170,500],[290,500],[290,455],[291,447],[294,440],[299,434],
+    [305,430],[312,427],[320,425],[328,424],[336,424],[340,424],
+    [344,424],[352,424],[360,425],[368,427],[375,430],[381,434],
+    [386,440],[389,447],[390,455],[390,500],[510,500],[388,75],[340,60]
+  ].map(([x,y]) => [AX + x * AS, AY + y * AS]);
+  doc.moveTo(archPts[0][0], archPts[0][1]);
+  archPts.slice(1).forEach(([x,y]) => doc.lineTo(x, y));
+  doc.closePath(); doc.fill();
+  doc.restoreGraphicsState();
+
+  // Brand block (top-left of main area)
+  const BX = SB + 16, BY = 16;
+  doc.setFillColor(26, 42, 94);
+  doc.rect(BX, BY, 6, 6, 'F');                        // brand mark square
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+  doc.setTextColor(26, 42, 94);
+  doc.text('ADROIT BIM CONSULTANTS LTD', BX + 9, BY + 3.5);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(5);
+  doc.setTextColor(139, 28, 28);
+  doc.text('CIVIL · STRUCTURAL · BIM ENGINEERING', BX + 9, BY + 7.5);
+
+  // Adroit logo (top right)
+  addLogo(PW - 52, 10, 42);
+
+  // Hero block — vertically centred in middle third
+  const HY = 105;
+  // Tag line
+  doc.setFillColor(139, 28, 28); doc.rect(BX, HY, 14, 0.8, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(5.5);
+  doc.setTextColor(139, 28, 28);
+  doc.text('SITE INSPECTION NOTES', BX + 18, HY + 0.5);
+
+  // Main title — large, dark navy
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
-  doc.setTextColor(42, 30, 98);
-  const titleLines = doc.splitTextToSize(p.name.toUpperCase(), 130);
-  let ty = 80;
-  titleLines.forEach(line => { doc.text(line, W/2, ty, {align:'center'}); ty += 14; });
+  doc.setFontSize(26);
+  doc.setTextColor(15, 26, 62);
+  const heroLines = doc.splitTextToSize(p.name.toUpperCase(), PW - SB - BX - 10);
+  let hy = HY + 12;
+  heroLines.forEach(line => { doc.text(line, BX, hy); hy += 14; });
 
-  doc.setFontSize(11); doc.setFont('helvetica', 'normal'); doc.setTextColor(61, 44, 141);
-  doc.text(docTitle.toUpperCase(), W/2, ty + 20, {align:'center'});
+  // Location
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+  doc.setTextColor(139, 28, 28);
+  doc.text((cover.location || 'KENYA').toUpperCase(), BX, hy + 4);
 
-  const monthYear = new Date(p.date).toLocaleString('en-GB', {month:'long', year:'numeric'}).toUpperCase();
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-  doc.text(monthYear, W/2, ty + 50, {align:'center'});
+  // Inspection number + date
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+  doc.setTextColor(26, 42, 94);
+  doc.text(`No. ${cover.inspectionNo || ''}  ·  ${cover.date || p.date || ''}`, BX, hy + 12);
+
+  // Meta grid (2 col)
+  const metaY = hy + 24;
+  doc.setDrawColor(26, 42, 94); doc.setLineWidth(0.25); doc.setGState(new doc.GState({ opacity: 0.2 }));
+  doc.line(BX, metaY, PW - 16, metaY);
+  doc.setGState(new doc.GState({ opacity: 1 }));
+
+  const metaItems = [
+    ['Client', cover.client || p.client || ''],
+    ['Architect', cover.architect || ''],
+    ['Civil Engineer', cover.engineer || 'Adroit BIM Consultants Ltd'],
+    ['Compiled by', cover.compiledBy || ''],
+    ['Contractor', cover.contractor || ''],
+    ['Lead Consultant', cover.leadConsultant || ''],
+  ].filter(([,v]) => v);
+
+  const COL1 = BX, COL2 = BX + (PW - SB - BX - 10) / 2 + 5;
+  let mx = COL1, my = metaY + 10;
+  metaItems.forEach(([key, val], i) => {
+    if (i === 3) { mx = COL2; my = metaY + 10; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(5);
+    doc.setTextColor(139, 28, 28);
+    doc.text(key.toUpperCase(), mx, my);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+    doc.setTextColor(26, 42, 94);
+    doc.text(val, mx, my + 4);
+    my += 14;
+  });
+
+  // Bottom bar
+  const BOT = PH - 16;
+  doc.setDrawColor(26, 42, 94); doc.setLineWidth(0.2); doc.setGState(new doc.GState({ opacity: 0.15 }));
+  doc.line(SB, BOT, PW, BOT);
+  doc.setGState(new doc.GState({ opacity: 1 }));
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(5);
+  doc.setTextColor(26, 42, 94);
+  doc.text('ACK Gardens House, 1st Ngong Avenue, Nairobi  ·  info@adroit.or.ke  ·  +254 720 248 031', SB + 16, BOT + 5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(5);
+  doc.setTextColor(26, 42, 94);
+  doc.text('CONFIDENTIAL', PW - 16, BOT + 5, { align: 'right' });
 
   // ─── PAGE 2: REVISION RECORD SHEET ───────────────────────
   doc.addPage();
@@ -1595,8 +1707,8 @@ async function exportPDF() {
     doc.rect(tl, y, tableW, h);
   }
 
-  rRow(ry, 10, [220, 218, 240]);
-  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(26,42,94);
+  rRow(ry, 10, [26, 42, 94]);
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255,255,255);
   doc.text('REVISION RECORD SHEET', W/2, ry+7, {align:'center'});
   ry += 10;
 
@@ -1606,7 +1718,7 @@ async function exportPDF() {
   doc.text(boiler, tl+5, ry+6);
   ry += 18;
 
-  rRow(ry, 8, [237,233,248]);
+  rRow(ry, 8, [230, 220, 220]);
   doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,42,94);
   doc.text('Revisions/Changes:', tl+5, ry+6);
   ry += 8;
@@ -1627,7 +1739,7 @@ async function exportPDF() {
 
   // Client row — purple label left, white value right
   const labelW = 38; // width of left label column
-  rRow(ry, 9, [237,233,248]);
+  rRow(ry, 9, [230, 220, 220]);
   doc.setFillColor(237,233,248); doc.rect(tl, ry, labelW, 9, 'F');
   doc.setDrawColor(100,100,100); doc.line(tl+labelW, ry, tl+labelW, ry+9);
   doc.setFillColor(255,255,255); doc.rect(tl+labelW, ry, tableW-labelW, 9, 'F');
@@ -1639,7 +1751,7 @@ async function exportPDF() {
   ry += 9;
 
   // Project row
-  rRow(ry, 9, [237,233,248]);
+  rRow(ry, 9, [230, 220, 220]);
   doc.setFillColor(237,233,248); doc.rect(tl, ry, labelW, 9, 'F');
   doc.setDrawColor(100,100,100); doc.line(tl+labelW, ry, tl+labelW, ry+9);
   doc.setFillColor(255,255,255); doc.rect(tl+labelW, ry, tableW-labelW, 9, 'F');
@@ -1651,7 +1763,7 @@ async function exportPDF() {
   ry += 9;
 
   // Document Title row
-  rRow(ry, 9, [237,233,248]);
+  rRow(ry, 9, [230, 220, 220]);
   doc.setFillColor(237,233,248); doc.rect(tl, ry, labelW, 9, 'F');
   doc.setDrawColor(100,100,100); doc.line(tl+labelW, ry, tl+labelW, ry+9);
   doc.setFillColor(255,255,255); doc.rect(tl+labelW, ry, tableW-labelW, 9, 'F');
@@ -1804,8 +1916,9 @@ async function exportPDF() {
   currentPage++;
   addLogo(140, 8, 58, 12);
 
-  for (let i = 0; i < p.issues.length; i++) {
-    const iss = p.issues[i];
+  const pdfIssues = p.issues.slice().reverse(); // oldest first; conclusion (last added) prints last
+  for (let i = 0; i < pdfIssues.length; i++) {
+    const iss = pdfIssues[i];
     try {
     const slotIndex = i % 2;
 
