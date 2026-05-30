@@ -1597,8 +1597,9 @@ async function exportPDF() {
   doc.text('Revisions/Changes:', tl+5, ry+6);
   ry += 8;
 
-  const revChanges = document.getElementById('ex_revchanges').value || 'Original Issue';
-  const remarks = document.getElementById('ex_remarks').value || 'For Information';
+  const _g = id => { var el = document.getElementById(id); return el ? el.value : ''; };
+  const revChanges = _g('ex_revchanges') || 'Original Issue';
+  const remarks    = _g('ex_remarks')    || 'For Information';
 
   // Calculate remaining space so table fills full A4 page
   // Fixed rows below body: Client(9)+Project(9)+DocTitle(9)+DocNoHdr(9)+Values(9)+Att(16) = 61mm
@@ -1674,9 +1675,8 @@ async function exportPDF() {
   doc.setFillColor(255,255,255); doc.rect(tl, ry, tableW, 9, 'F');
   doc.rect(tl, ry, tableW, 9);
   doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
-  const rowVals = [docNo, document.getElementById('ex_rev').value, document.getElementById('ex_date').value,
-   document.getElementById('ex_originated').value, document.getElementById('ex_checked').value,
-   document.getElementById('ex_reviewed').value, document.getElementById('ex_approved').value
+  const rowVals = [docNo, _g('ex_rev'), _g('ex_date'),
+   _g('ex_originated'), _g('ex_checked'), _g('ex_reviewed'), _g('ex_approved')
   ];
   rowVals.forEach((v,i) => {
     // Use smaller font for doc number (index 0) to handle long strings
@@ -1946,10 +1946,10 @@ async function exportWord() {
           shading: { fill: WHITE, type: ShadingType.CLEAR },
           margins: { top: 100, bottom: 100, left: 100, right: 100 },
           children: [
-            new Paragraph({ children: [new TextRun({ text: document.getElementById('ex_revchanges').value || 'Original Issue', size: 18 })] }),
+            new Paragraph({ children: [new TextRun({ text: (function(){var e=document.getElementById('ex_revchanges');return e?e.value:'';})() || 'Original Issue', size: 18 })] }),
             new Paragraph({ spacing: { before: 400 }, children: [
               new TextRun({ text: 'Remarks:  ', bold: true, size: 18 }),
-              new TextRun({ text: document.getElementById('ex_remarks').value || 'For Information', size: 18 })
+              new TextRun({ text: (function(){var e=document.getElementById('ex_remarks');return e?e.value:'';})() || 'For Information', size: 18 })
             ]})
           ]
         })
@@ -1981,12 +1981,12 @@ async function exportWord() {
       ]}),
       new TableRow({ children: [
         cell(docNo, {width:1800, align: AlignmentType.CENTER}),
-        cell(document.getElementById('ex_rev').value, {width:500, align: AlignmentType.CENTER}),
+        cell((function(){var e=document.getElementById('ex_rev');return e?e.value:'';})(), {width:500, align: AlignmentType.CENTER}),
         cell(document.getElementById('ex_date').value, {width:1000, align: AlignmentType.CENTER}),
-        cell(document.getElementById('ex_originated').value, {width:1100, align: AlignmentType.CENTER}),
-        cell(document.getElementById('ex_checked').value, {width:1100, align: AlignmentType.CENTER}),
-        cell(document.getElementById('ex_reviewed').value, {width:1100, align: AlignmentType.CENTER}),
-        cell(document.getElementById('ex_approved').value, {width:1426, align: AlignmentType.CENTER}),
+        cell((function(){var e=document.getElementById('ex_originated');return e?e.value:'';})(), {width:1100, align: AlignmentType.CENTER}),
+        cell((function(){var e=document.getElementById('ex_checked');return e?e.value:'';})(), {width:1100, align: AlignmentType.CENTER}),
+        cell((function(){var e=document.getElementById('ex_reviewed');return e?e.value:'';})(), {width:1100, align: AlignmentType.CENTER}),
+        cell((function(){var e=document.getElementById('ex_approved');return e?e.value:'';})(), {width:1426, align: AlignmentType.CENTER}),
       ]}),
       new TableRow({ children: [
         cell('Attachments', { width: 1800, fill: HH_PURPLE_LIGHT, bold: true, color: HH_PURPLE }),
