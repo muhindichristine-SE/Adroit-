@@ -175,6 +175,9 @@ textarea.inp{resize:vertical;}
 
 /* Divider */
 .divider{height:1px;background:var(--border);margin:16px 0;}
+/* Quick chips */
+.chip{padding:6px 12px;border-radius:20px;border:1.5px solid var(--border);background:#fff;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer;white-space:nowrap;}
+.chip:active{background:var(--navy);color:#fff;border-color:var(--navy);}
 </style>
 </head>
 <body>
@@ -315,7 +318,11 @@ textarea.inp{resize:vertical;}
   </div>
   <div class="form-body">
     <input type="hidden" id="if-idx">
-    <div class="fg"><label class="lbl">Issue Title / Category *</label><input class="inp" id="if-t" type="text" placeholder="e.g. Cracked slab at grid C-4"></div>
+    <div class="fg">
+      <label class="lbl">Issue Title / Category *</label>
+      <input class="inp" id="if-t" type="text" placeholder="e.g. Cracked slab at grid C-4">
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;" id="quick-chips"></div>
+    </div>
     <div class="fg"><label class="lbl">Description</label><textarea class="inp" id="if-d" rows="3" placeholder="Describe the issue in detail..."></textarea></div>
     <div class="fg"><label class="lbl">Severity</label>
       <div class="sev-row">
@@ -333,12 +340,16 @@ textarea.inp{resize:vertical;}
     </div>
     <div class="fg"><label class="lbl">Assigned To</label><input class="inp" id="if-a" type="text" placeholder="e.g. Contractor / Foreman"></div>
     <div class="fg"><label class="lbl">Photo</label>
-      <div class="photo-up" onclick="document.getElementById('ph-inp').click()">
-        <span id="ph-ph">Tap to add photo</span>
-        <img id="ph-prev" class="photo-prev" style="display:none;" alt="Preview">
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <button class="btn btn-o btn-block btn-sm" onclick="document.getElementById('ph-cam').click()">&#128247; Take Photo</button>
+        <button class="btn btn-o btn-block btn-sm" onclick="document.getElementById('ph-gal').click()">&#128444; Upload</button>
       </div>
-      <input type="file" id="ph-inp" accept="image/*" style="display:none;" onchange="handlePhoto(event)">
-      <button class="btn btn-o btn-sm" style="margin-top:6px;display:none;" id="ph-rm" onclick="rmPhoto()">Remove photo</button>
+      <input type="file" id="ph-cam" accept="image/*" capture="environment" style="display:none;" onchange="handlePhoto(event)">
+      <input type="file" id="ph-gal" accept="image/*" style="display:none;" onchange="handlePhoto(event)">
+      <div id="ph-prev-wrap" style="display:none;">
+        <img id="ph-prev" class="photo-prev" alt="Preview">
+        <button class="btn btn-o btn-sm" style="margin-top:6px;" id="ph-rm" onclick="rmPhoto()">Remove photo</button>
+      </div>
     </div>
     <button class="btn btn-p btn-block" onclick="saveIssue()">Save Issue</button>
     <button class="btn btn-o btn-block" style="margin-top:10px;color:var(--crimson);border-color:var(--crimson);display:none;" id="del-iss-btn" onclick="delIssue()">Delete Issue</button>
@@ -424,14 +435,16 @@ async function bulkAct(a){if(!_sel.size){toast('No issues selected');return;}var
 function viewPh(id){var p=S.projects[S.proj];var iss=p.issues.find(function(i){return i.id===id;});if(iss&&iss.photo){document.getElementById('pm-img').src=iss.photo;document.getElementById('pm').classList.add('active');}}
 
 // ── ISSUE FORM ───────────────────────────────────────────────────────
-function openIssueForm(idx){var isEdit=idx>=0;document.getElementById('if-title').textContent=isEdit?'Edit Issue':'Add Issue';document.getElementById('del-iss-btn').style.display=isEdit?'block':'none';document.getElementById('if-idx').value=isEdit?idx:'';var iss=isEdit?S.projects[S.proj].issues[idx]:{};document.getElementById('if-t').value=iss.title||'';document.getElementById('if-d').value=iss.description||'';document.getElementById('if-a').value=iss.assignedTo||'';setSev(iss.severity||'Minor');setStat(iss.status||'Open');_photo=iss.photo||null;updPhoto();go('iform');}
+function openIssueForm(idx){var isEdit=idx>=0;document.getElementById('if-title').textContent=isEdit?'Edit Issue':'Add Issue';document.getElementById('del-iss-btn').style.display=isEdit?'block':'none';document.getElementById('if-idx').value=isEdit?idx:'';var iss=isEdit?S.projects[S.proj].issues[idx]:{};document.getElementById('if-t').value=iss.title||'';document.getElementById('if-d').value=iss.description||'';document.getElementById('if-a').value=iss.assignedTo||'';setSev(iss.severity||'Minor');setStat(iss.status||'Open');_photo=iss.photo||null;updPhoto();buildChips();go('iform');}
 function setSev(s){_sev=s;['Critical','Major','Minor'].forEach(function(v){var b=document.getElementById('sv-'+v);b.className='sev-btn'+(v===s?' '+(v==='Critical'?'ac':v==='Major'?'am':'an'):'');});}
 function setStat(s){_stat=s;['Open','In Progress','Closed'].forEach(function(v){var id='ss-'+v.replace(' ','');var b=document.getElementById(id);if(b)b.className='stat-btn'+(v===s?' active':'');});}
 function handlePhoto(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){compress(ev.target.result,function(d){_photo=d;updPhoto();});};r.readAsDataURL(f);}
 function compress(url,cb){var img=new Image();img.onload=function(){var w=img.naturalWidth,h=img.naturalHeight;if(w<=1280&&h<=960){cb(url);return;}var sc=Math.min(1280/w,960/h);w=Math.round(w*sc);h=Math.round(h*sc);var c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',0.78));};img.src=url;}
-function updPhoto(){var pv=document.getElementById('ph-prev'),ph=document.getElementById('ph-ph'),rm=document.getElementById('ph-rm');if(_photo){pv.src=_photo;pv.style.display='block';ph.style.display='none';rm.style.display='inline-flex';}else{pv.style.display='none';ph.style.display='block';rm.style.display='none';}}
-function rmPhoto(){_photo=null;updPhoto();document.getElementById('ph-inp').value='';}
-async function saveIssue(){var t=document.getElementById('if-t').value.trim();if(!t){toast('Title is required');return;}var idxStr=document.getElementById('if-idx').value;var isEdit=idxStr!=='';var p=S.projects[S.proj];var iss=isEdit?p.issues[parseInt(idxStr)]:{id:uid(),createdAt:Date.now()};iss.title=t;iss.description=document.getElementById('if-d').value.trim();iss.severity=_sev;iss.status=_stat;iss.assignedTo=document.getElementById('if-a').value.trim();iss.photo=_photo;if(!isEdit)p.issues.unshift(iss);await saveDB();toast('Issue saved');go('proj');}
+function updPhoto(){var pw=document.getElementById('ph-prev-wrap'),pv=document.getElementById('ph-prev');if(_photo){pv.src=_photo;pw.style.display='block';}else{pw.style.display='none';}}
+function rmPhoto(){_photo=null;updPhoto();document.getElementById('ph-cam').value='';document.getElementById('ph-gal').value='';}
+var QUICK_CATS=['Cracked concrete','Exposed rebar','Poor finishing','Inadequate curing','Honeycombing','Spalling','Misalignment','Missing reinforcement','Waterproofing defect','Dampness / leakage','Formwork defect','Inadequate cover','Settlement / subsidence','Missing expansion joint','Safety hazard','Inadequate compaction','Surface defect','Structural concern'];
+function buildChips(){var el=document.getElementById('quick-chips');el.innerHTML=QUICK_CATS.map(function(c){return'<button class="chip" onclick="pickChip(\''+c+'\')" type="button">'+c+'</button>';}).join('');}
+function pickChip(val){var inp=document.getElementById('if-t');inp.value=val;inp.focus();}async function saveIssue(){var t=document.getElementById('if-t').value.trim();if(!t){toast('Title is required');return;}var idxStr=document.getElementById('if-idx').value;var isEdit=idxStr!=='';var p=S.projects[S.proj];var iss=isEdit?p.issues[parseInt(idxStr)]:{id:uid(),createdAt:Date.now()};iss.title=t;iss.description=document.getElementById('if-d').value.trim();iss.severity=_sev;iss.status=_stat;iss.assignedTo=document.getElementById('if-a').value.trim();iss.photo=_photo;if(!isEdit)p.issues.unshift(iss);await saveDB();toast('Issue saved');go('proj');}
 async function delIssue(){if(!confirm('Delete this issue?'))return;var idx=parseInt(document.getElementById('if-idx').value);S.projects[S.proj].issues.splice(idx,1);await saveDB();toast('Issue deleted');go('proj');}
 
 // ── SUMMARY ──────────────────────────────────────────────────────────
