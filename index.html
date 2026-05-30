@@ -6,8 +6,19 @@
 <title>Adroit Site Audit</title>
 <!-- Save this file as index.html for GitHub Pages PWA install support -->
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@300;400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+// Lazy-load jsPDF on demand so a slow CDN doesn't block app startup
+function _ensureJsPDF() {
+  return new Promise(function(resolve, reject) {
+    if (window.jspdf) { resolve(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = resolve;
+    s.onerror = function() { reject(new Error('jsPDF library could not load. Check your internet connection.')); };
+    document.head.appendChild(s);
+  });
+}
+</script>
 <script>
 // docx library is loaded on-demand when Word export is first triggered
 // This removes a 1MB+ blocking script from initial page load
@@ -1531,6 +1542,9 @@ function addAdroitPdfCover(doc, p) { var c=getCoverData(p), W=210, H=297; doc.se
 // PDF EXPORT
 async function exportPDF() {
   closeExportModal();
+  toast('📄 Generating PDF…');
+  try {
+  await _ensureJsPDF();
   const { jsPDF } = window.jspdf;
   const p = S.projects[S.proj];
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -1867,6 +1881,10 @@ async function exportPDF() {
 
   doc.save(`${p.name.replace(/\s+/g,'-')}-Inspection-Report.pdf`);
   toast('📄 PDF exported!');
+  } catch(err) {
+    console.error('PDF export error:', err);
+    toast('⚠ PDF failed: ' + (err.message || String(err)));
+  }
 }
 
 // WORD EXPORT
