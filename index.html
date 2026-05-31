@@ -789,35 +789,104 @@ async function exportPDF() {
   try {
     var p = S.projects[S.proj];
     var doc = new window.jspdf.jsPDF({unit:'mm', format:'a4'});
-    var W=210, H=297, NV=[30,45,94], CR=[165,28,48], WH=[255,255,255];
+    var W=210, H=297;
+    var NV=[26,42,94], CR=[139,28,28], WH=[255,255,255];
+    var BG=[249,248,245];
+
+    // ── BACKGROUND ──────────────────────────────────────────────────
+    doc.setFillColor(BG[0],BG[1],BG[2]); doc.rect(0,0,W,H,'F');
+
+    // ── NAVY SIDEBAR (5% = 10.5mm) ──────────────────────────────────
     doc.setFillColor(NV[0],NV[1],NV[2]); doc.rect(0,0,10.5,H,'F');
-    doc.setFillColor(CR[0],CR[1],CR[2]); doc.rect(0,0,W,3,'F');
-    doc.setFillColor(WH[0],WH[1],WH[2]); doc.rect(10.5,3,W-10.5,H-3,'F');
-    doc.setFontSize(8); doc.setFont(undefined,'bold'); doc.setTextColor(CR[0],CR[1],CR[2]);
-    doc.text('ADROIT BIM CONSULTANTS LTD',15,14);
-    doc.setFontSize(7); doc.setFont(undefined,'normal'); doc.setTextColor(100,100,120);
-    doc.text('Civil - Structural - BIM Engineering',15,20);
-    doc.setFontSize(22); doc.setFont(undefined,'bold'); doc.setTextColor(NV[0],NV[1],NV[2]);
-    doc.text('SITE INSPECTION',15,36); doc.text('NOTES',15,47);
-    doc.setFontSize(13); doc.setFont(undefined,'normal');
-    var nLines = doc.splitTextToSize(p.name||'', W-25);
-    doc.text(nLines,15,62);
-    var lY = 62 + nLines.length*6 + 8;
-    doc.setFontSize(9); doc.setFont(undefined,'bold'); doc.setTextColor(CR[0],CR[1],CR[2]);
-    doc.text(((p.location||'').toUpperCase()+(p.location&&p.date?' - ':'')+( p.date||'')), 15, lY);
-    doc.setDrawColor(180,180,200); doc.setLineWidth(0.3); doc.line(15,lY+6,W-10,lY+6);
-    var fields=[['CLIENT',p.client],['CONTRACTOR',p.contractor],['CIVIL ENGINEER',p.engineer],['DATE',p.date],['DRAWN BY',p.drawnBy],['CHECKED BY',p.checkedBy],['REVIEWED BY',p.reviewedBy],['REV. NO.',p.revNo],['REFERENCE',p.reference],['','']];
-    var gy = lY+15;
-    for (var fi=0; fi<fields.length; fi+=2) {
-      for (var c=0; c<2; c++) {
-        var f = fields[fi+c]; if (!f||!f[0]) continue;
-        var x = c===0 ? 15 : W/2+5;
-        doc.setFontSize(7); doc.setFont(undefined,'bold'); doc.setTextColor(CR[0],CR[1],CR[2]); doc.text(f[0],x,gy);
-        doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(NV[0],NV[1],NV[2]); doc.text(f[1]||'--',x,gy+5);
+    // Crimson accent line in sidebar
+    doc.setFillColor(CR[0],CR[1],CR[2]); doc.rect(0,13,5.8,0.7,'F');
+    // Sidebar dot at bottom
+    doc.setFillColor(CR[0],CR[1],CR[2]); doc.rect(3.75,275,3,3,'F');
+    // Sidebar vertical text
+    doc.setFontSize(4); doc.setFont(undefined,'normal'); doc.setTextColor(255,255,255);
+    doc.text('ADR · '+(p.reference||'REF')+ ' · '+(p.date||'2026'), 5.25, 240, {angle:90, align:'center'});
+
+    // ── CRIMSON TOP RULE ────────────────────────────────────────────
+    doc.setFillColor(CR[0],CR[1],CR[2]); doc.rect(10.5,0,W-10.5,0.8,'F');
+
+    // ── ARCH WATERMARK (very faint) ─────────────────────────────────
+    doc.setFillColor(232,232,236);
+    doc.lines([
+      [-10.56,0,-20.28,6.34,-20.28,6.34],
+      [-51.53,179.52],[50.69,0],[0,-19.01],
+      [0,-11.4,9.72,-19.01,21.12,-19.01],
+      [11.4,0,21.12,7.6,21.12,19.01],
+      [0,19.01],[50.69,0],[-51.53,-179.52],
+      [0,0,-9.72,-6.34,-20.28,-6.34]
+    ], 110.25, 55.58, [1,1], 'F', true);
+
+    // ── CORNER MARKS ────────────────────────────────────────────────
+    doc.setDrawColor(180,180,200); doc.setLineWidth(0.3);
+    doc.line(18,10,18,16); doc.line(18,10,24,10); // TL
+    doc.line(W-8,H-16,W-8,H-10); doc.line(W-14,H-10,W-8,H-10); // BR
+
+    // ── BRAND BLOCK ─────────────────────────────────────────────────
+    var BX=20, BY=20;
+    doc.setFillColor(NV[0],NV[1],NV[2]); doc.rect(BX,BY,5,5,'F');
+    doc.setFontSize(6.5); doc.setFont(undefined,'bold'); doc.setTextColor(NV[0],NV[1],NV[2]);
+    doc.text('ADROIT BIM CONSULTANTS LTD', BX+7, BY+3.5);
+    doc.setFontSize(5); doc.setFont(undefined,'normal'); doc.setTextColor(CR[0],CR[1],CR[2]);
+    doc.text('Civil  ·  Structural  ·  BIM Engineering', BX+7, BY+7);
+
+    // ── HERO BLOCK ──────────────────────────────────────────────────
+    var HY=85;
+    // Tag line
+    doc.setFillColor(CR[0],CR[1],CR[2]); doc.rect(BX,HY,8,0.8,'F');
+    doc.setFontSize(5.5); doc.setFont(undefined,'bold'); doc.setTextColor(CR[0],CR[1],CR[2]);
+    doc.text('SITE INSPECTION NOTES', BX+10, HY+0.6);
+    // Large project title
+    doc.setFontSize(24); doc.setFont(undefined,'bold'); doc.setTextColor(15,26,62);
+    var titleLines = doc.splitTextToSize(p.name||'Untitled Project', W-BX-20);
+    doc.text(titleLines, BX, HY+14);
+    var heroBottom = HY+14+titleLines.length*11;
+    // Location
+    doc.setFontSize(6.5); doc.setFont(undefined,'bold'); doc.setTextColor(CR[0],CR[1],CR[2]);
+    doc.text(((p.location||'').toUpperCase()), BX, heroBottom+5);
+    // Ref & date
+    doc.setFontSize(8); doc.setFont(undefined,'bold'); doc.setTextColor(NV[0],NV[1],NV[2]);
+    doc.setGState && doc.setGState(doc.GState({opacity:0.55}));
+    doc.text((p.reference||'')+(p.reference&&p.date?'  ·  ':'')+( p.date||''), BX, heroBottom+13);
+    doc.setGState && doc.setGState(doc.GState({opacity:1}));
+
+    // ── META GRID ───────────────────────────────────────────────────
+    var MY = Math.max(heroBottom+22, 200);
+    doc.setDrawColor(NV[0],NV[1],NV[2]); doc.setLineWidth(0.2);
+    doc.line(BX, MY, W-15, MY);
+    var metaFields=[
+      ['CLIENT',p.client],['CONTRACTOR',p.contractor],
+      ['CIVIL ENGINEER',p.engineer],['DRAWN BY',p.drawnBy],
+      ['CHECKED BY',p.checkedBy],['REVIEWED BY',p.reviewedBy]
+    ];
+    var mgY=MY+10;
+    for(var mi=0;mi<metaFields.length;mi+=2){
+      for(var mc=0;mc<2;mc++){
+        var mf=metaFields[mi+mc]; if(!mf)continue;
+        var mx=mc===0?BX:W/2+5;
+        doc.setFontSize(5); doc.setFont(undefined,'bold'); doc.setTextColor(CR[0],CR[1],CR[2]);
+        doc.text(mf[0],mx,mgY);
+        doc.setFontSize(6.5); doc.setFont(undefined,'normal'); doc.setTextColor(NV[0],NV[1],NV[2]);
+        doc.text(mf[1]||'--',mx,mgY+5);
       }
-      gy += 15;
+      mgY+=13;
     }
-    doc.setFontSize(7); doc.setTextColor(160,160,180); doc.text('Generated: '+new Date().toLocaleDateString('en-GB'),15,H-8);
+
+    // ── BOTTOM BAR ──────────────────────────────────────────────────
+    doc.setDrawColor(NV[0],NV[1],NV[2]); doc.setLineWidth(0.2);
+    doc.line(BX,H-15,W-15,H-15);
+    doc.setFontSize(5); doc.setFont(undefined,'normal'); doc.setTextColor(NV[0],NV[1],NV[2]);
+    doc.setGState && doc.setGState(doc.GState({opacity:0.4}));
+    doc.text('ACK Gardens House, 1st Ngong Avenue, Nairobi  ·  info@adroit.or.ke  ·  +254 720 248 031', BX, H-10);
+    doc.setGState && doc.setGState(doc.GState({opacity:0.6}));
+    doc.setFillColor(CR[0],CR[1],CR[2]); doc.rect(W-26,H-12,1.5,1.5,'F');
+    doc.setFontSize(5); doc.setFont(undefined,'bold'); doc.setTextColor(NV[0],NV[1],NV[2]);
+    doc.text('CONFIDENTIAL', W-23, H-10);
+    doc.setGState && doc.setGState(doc.GState({opacity:1}));
+
     var issues = p.issues||[];
     function addHdr(lbl) {
       doc.addPage();
