@@ -359,7 +359,14 @@ textarea.inp{resize:vertical;}
       </select>
       <input class="inp" id="if-t" type="text" placeholder="Category or custom title..." style="margin-top:8px;">
     </div>
-    <div class="fg"><label class="lbl">Description</label><textarea class="inp" id="if-d" rows="3" placeholder="Describe the issue in detail..."></textarea></div>
+    <div class="fg">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+        <label class="lbl" style="margin-bottom:0;">Description</label>
+        <button type="button" id="mic-btn" onclick="toggleVoice()" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:5px 10px;font-size:16px;cursor:pointer;color:var(--navy);">&#127908;</button>
+      </div>
+      <textarea class="inp" id="if-d" rows="3" placeholder="Describe the issue in detail..."></textarea>
+      <div id="mic-status" style="font-size:11px;color:var(--crimson);margin-top:4px;display:none;">&#9679; Listening... tap mic to stop</div>
+    </div>
     <div class="fg"><label class="lbl">Severity</label>
       <div class="sev-row">
         <button class="sev-btn" id="sv-Critical" onclick="setSev('Critical')">Critical</button>
@@ -375,18 +382,18 @@ textarea.inp{resize:vertical;}
       </div>
     </div>
     <div class="fg"><label class="lbl">Assigned To</label>
-      <select class="inp" id="if-a">
-        <option value="">-- Select party --</option>
-        <option>Contractor</option>
-        <option>Architect</option>
-        <option>Civil / Structural Engineer</option>
-        <option>Project Manager</option>
-        <option>Mechanical Engineer</option>
-        <option>Electrical Engineer</option>
-        <option>Quantity Surveyor</option>
-        <option>Site Supervisor</option>
-        <option>Client</option>
-      </select>
+      <input class="inp" id="if-a" type="text" list="assign-opts" placeholder="Select or type a party...">
+      <datalist id="assign-opts">
+        <option value="Contractor">
+        <option value="Architect">
+        <option value="Civil / Structural Engineer">
+        <option value="Project Manager">
+        <option value="Mechanical Engineer">
+        <option value="Electrical Engineer">
+        <option value="Quantity Surveyor">
+        <option value="Site Supervisor">
+        <option value="Client">
+      </datalist>
     </div>
     <div class="fg"><label class="lbl">Photo</label>
       <div style="display:flex;gap:8px;margin-bottom:8px;">
@@ -503,215 +510,70 @@ function renderProj(){var p=S.projects[S.proj];if(!p){go('home');return;}documen
 function switchTab(t){document.getElementById('t-issues').classList.toggle('active',t==='issues');document.getElementById('t-summary').classList.toggle('active',t==='summary');document.getElementById('tc-issues').style.display=t==='issues'?'block':'none';document.getElementById('tc-sum').style.display=t==='summary'?'block':'none';if(t==='issues')renderIssues();if(t==='summary')renderSum();}
 
 // ── ISSUES ───────────────────────────────────────────────────────────
-function renderIssues(){var p=S.projects[S.proj];if(!p)return;var fs=document.getElementById('f-sev').value,ft=document.getElementById('f-stat').value;var vis=(p.issues||[]).filter(function(i){if(fs&&i.severity!==fs)return false;if(ft&&i.status!==ft)return false;return true;});document.getElementById('iss-cnt').textContent=vis.length+' issue'+(vis.length!==1?'s':'');var el=document.getElementById('iss-list');if(!(p.issues||[]).length){el.innerHTML='<div class="empty"><div class="empty-ico">&#128203;</div><div class="empty-t">No issues logged</div><div class="empty-s">Tap "+ Add Issue" to begin</div></div>';return;}if(!vis.length){el.innerHTML='<div class="empty"><div class="empty-ico">&#128269;</div><div class="empty-t">No matching issues</div><div class="empty-s">Try changing the filters</div></div>';return;}el.innerHTML=vis.map(function(iss){var ri=p.issues.indexOf(iss);var sc=iss.status==='Open'?'to':iss.status==='In Progress'?'ti':'tl';var vc=iss.severity==='Critical'?'tc':iss.severity==='Major'?'tm':'tn';var chk=_bulk&&_sel.has(iss.id);var leftEl=_bulk?'<div class="bchk'+(chk?' checked':'')+'" onclick="togSel(\''+iss.id+'\',event)"></div>':'<div class="drag">&#8942;&#8942;</div>';return'<div class="icard" draggable="true" data-idx="'+ri+'" ondragstart="dStart(event,'+ri+')" ondragover="dOver(event)" ondrop="dDrop(event,'+ri+')" ondragend="dEnd(event)">'+leftEl+'<div class="ibody"><div class="itop"><div class="ititle">'+esc(iss.title)+'</div><span class="tag '+vc+'">'+( iss.severity||'Minor')+'</span></div>'+(iss.description?'<div class="idesc">'+esc(iss.description)+'</div>':'')+'<div class="ifooter"><button class="tag '+sc+'" onclick="qStat('+ri+',event)">'+( iss.status||'Open')+'</button>'+(iss.assignedTo?'<span class="asgn">&#8594; '+esc(iss.assignedTo)+'</span>':'')+'<span class="idate">'+fmtD(iss.createdAt)+'</span></div><div class="iactions"><button class="btn btn-o btn-sm" onclick="openIssueForm('+ri+')">Edit</button></div></div>'+(iss.photo?'<img class="iphoto" src="'+iss.photo+'" onclick="viewPh(\''+iss.id+'\')" alt="photo">':'<div class="nophoto">&#128247;</div>')+'</div>';}).join('');}
-
-async function qStat(idx,e){e.stopPropagation();var cy={'Open':'In Progress','In Progress':'Closed','Closed':'Open'};var iss=S.projects[S.proj].issues[idx];iss.status=cy[iss.status]||'Open';await saveDB();renderIssues();}
-function dStart(e,i){_dragSrc=i;e.target.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
-function dOver(e){e.preventDefault();}
-async function dDrop(e,ti){e.preventDefault();if(_dragSrc===ti)return;var p=S.projects[S.proj];var mv=p.issues.splice(_dragSrc,1)[0];p.issues.splice(ti,0,mv);await saveDB();renderIssues();}
-function dEnd(e){e.target.classList.remove('dragging');_dragSrc=-1;}
-async function floatCrit(){var p=S.projects[S.proj];p.issues=p.issues.filter(function(i){return i.severity==='Critical';}).concat(p.issues.filter(function(i){return i.severity!=='Critical';}));await saveDB();renderIssues();toast('Critical issues floated to top');}
-function toggleBulk(){_bulk=!_bulk;_sel.clear();document.getElementById('bulk-bar').style.display=_bulk?'flex':'none';document.getElementById('sel-btn').textContent=_bulk?'Cancel':'Select';renderIssues();}
-function togSel(id,e){e.stopPropagation();if(_sel.has(id))_sel.delete(id);else _sel.add(id);document.getElementById('bulk-cnt').textContent=_sel.size+' selected';renderIssues();}
-async function bulkAct(a){if(!_sel.size){toast('No issues selected');return;}var p=S.projects[S.proj];if(a==='del'){if(!confirm('Delete '+_sel.size+' issue(s)?'))return;p.issues=p.issues.filter(function(i){return!_sel.has(i.id);});}else{var m={closed:'Closed',inprog:'In Progress'};p.issues.forEach(function(i){if(_sel.has(i.id))i.status=m[a];});}await saveDB();toggleBulk();toast('Done');}
-function viewPh(id){var p=S.projects[S.proj];var iss=p.issues.find(function(i){return i.id===id;});if(iss&&iss.photo){document.getElementById('pm-img').src=iss.photo;document.getElementById('pm').classList.add('active');}}
-
-// ── ISSUE FORM ───────────────────────────────────────────────────────
-function openIssueForm(idx){var isEdit=idx>=0;document.getElementById('if-title').textContent=isEdit?'Edit Issue':'Add Issue';document.getElementById('del-iss-btn').style.display=isEdit?'block':'none';document.getElementById('if-idx').value=isEdit?idx:'';var iss=isEdit?S.projects[S.proj].issues[idx]:{};
-// Populate category dropdown & text
-var cat=document.getElementById('if-cat');var txt=document.getElementById('if-t');var title=iss.title||'';var knownCats=['Cracked concrete','Exposed rebar','Poor finishing','Inadequate curing','Honeycombing','Spalling','Misalignment','Missing reinforcement','Waterproofing defect','Dampness / leakage','Formwork defect','Inadequate cover','Settlement / subsidence','Missing expansion joint','Safety hazard','Inadequate compaction','Surface defect','Structural concern'];
-if(knownCats.indexOf(title)>=0){cat.value=title;txt.value=title;}else{cat.value=title?'Other (type below)':'';txt.value=title;}
-document.getElementById('if-d').value=iss.description||'';
-// Assigned to dropdown
-var asel=document.getElementById('if-a');var aval=iss.assignedTo||'';var aOpts=['Contractor','Architect','Civil / Structural Engineer','Project Manager','Mechanical Engineer','Electrical Engineer','Quantity Surveyor','Site Supervisor','Client'];asel.value=aOpts.indexOf(aval)>=0?aval:'';
-setSev(iss.severity||'Minor');setStat(iss.status||'Open');_photo=iss.photo||null;updPhoto();buildChips();go('iform');}
-function setSev(s){_sev=s;['Critical','Major','Minor'].forEach(function(v){var b=document.getElementById('sv-'+v);b.className='sev-btn'+(v===s?' '+(v==='Critical'?'ac':v==='Major'?'am':'an'):'');});}
-function setStat(s){_stat=s;['Open','In Progress','Closed'].forEach(function(v){var id='ss-'+v.replace(' ','');var b=document.getElementById(id);if(b)b.className='stat-btn'+(v===s?' active':'');});}
-function handlePhoto(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){compress(ev.target.result,function(d){_photo=d;updPhoto();});};r.readAsDataURL(f);}
-function compress(url,cb){var img=new Image();img.onload=function(){var w=img.naturalWidth,h=img.naturalHeight;if(w<=1280&&h<=960){cb(url);return;}var sc=Math.min(1280/w,960/h);w=Math.round(w*sc);h=Math.round(h*sc);var c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',0.78));};img.src=url;}
-function updPhoto(){var pw=document.getElementById('ph-prev-wrap'),pv=document.getElementById('ph-prev');if(_photo){pv.src=_photo;pw.style.display='block';}else{pw.style.display='none';}}
-function rmPhoto(){_photo=null;updPhoto();document.getElementById('ph-cam').value='';document.getElementById('ph-gal').value='';}
-function catPick(val){if(val&&val!=='Other (type below)')document.getElementById('if-t').value=val;}
-var QUICK_CATS=[];function buildChips(){}function pickChip(){}
-async function saveIssue(){var t=document.getElementById('if-t').value.trim();if(!t){toast('Title is required');return;}var idxStr=document.getElementById('if-idx').value;var isEdit=idxStr!=='';var p=S.projects[S.proj];var iss=isEdit?p.issues[parseInt(idxStr)]:{id:uid(),createdAt:Date.now()};iss.title=t;iss.description=document.getElementById('if-d').value.trim();iss.severity=_sev;iss.status=_stat;iss.assignedTo=document.getElementById('if-a').value;iss.photo=_photo;if(!isEdit)p.issues.unshift(iss);await saveDB();toast('Issue saved');go('proj');}
-async function delIssue(){if(!confirm('Delete this issue?'))return;var idx=parseInt(document.getElementById('if-idx').value);S.projects[S.proj].issues.splice(idx,1);await saveDB();toast('Issue deleted');go('proj');}
-
-// ── SUMMARY ──────────────────────────────────────────────────────────
-function renderSum(){var p=S.projects[S.proj];var iss=p.issues||[];var bStat={Open:0,'In Progress':0,Closed:0},bSev={Critical:0,Major:0,Minor:0};iss.forEach(function(i){bStat[i.status]=(bStat[i.status]||0)+1;bSev[i.severity]=(bSev[i.severity]||0)+1;});function mi(l,v){return'<div><div class="sum-lbl">'+l+'</div><div class="sum-val">'+esc(v||'--')+'</div></div>';}function sr(l,v){return'<div class="srow"><span style="color:var(--muted);font-size:13px;">'+l+'</span><span style="font-weight:700;color:var(--navy);">'+v+'</span></div>';}document.getElementById('sum-body').innerHTML='<div class="sum-card"><div class="sum-card-title">Project Information</div><div class="sum-grid">'+mi('Client',p.client)+mi('Location',p.location)+mi('Contractor',p.contractor)+mi('Engineer',p.engineer)+mi('Date',p.date)+mi('Reference',p.reference)+'</div></div><div class="sum-card"><div class="sum-card-title">Document Control</div><div class="sum-grid">'+mi('Drawn By',p.drawnBy)+mi('Checked By',p.checkedBy)+mi('Reviewed By',p.reviewedBy)+mi('Rev. No.',p.revNo)+'</div></div><div class="sum-card"><div class="sum-card-title">Issue Statistics</div>'+sr('Total Issues',iss.length)+sr('&#128308; Critical',bSev.Critical)+sr('&#128993; Major',bSev.Major)+sr('&#128994; Minor',bSev.Minor)+sr('Open',bStat.Open||0)+sr('In Progress',bStat['In Progress']||0)+sr('Closed',bStat.Closed||0)+'</div>';}
-
-// ── PDF EXPORT ───────────────────────────────────────────────────────
-async function exportPDF(){if(!window.jspdf||!window.jspdf.jsPDF){toast('PDF library not loaded — check connection',4000);return;}toast('Generating PDF...',7000);await new Promise(function(r){setTimeout(r,80);});try{var p=S.projects[S.proj];var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF({unit:'mm',format:'a4'});var W=210,H=297;var NV=[30,45,94],CR=[165,28,48],WH=[255,255,255];
-// Navy sidebar
-doc.setFillColor(NV[0],NV[1],NV[2]);doc.rect(0,0,10.5,H,'F');
-// Crimson top bar
-doc.setFillColor(CR[0],CR[1],CR[2]);doc.rect(0,0,W,3,'F');
-// White content area
-doc.setFillColor(WH[0],WH[1],WH[2]);doc.rect(10.5,3,W-10.5,H-3,'F');
-// Company name
-doc.setFontSize(8);doc.setFont(undefined,'bold');doc.setTextColor(CR[0],CR[1],CR[2]);doc.text('ADROIT BIM CONSULTANTS LTD',15,14);
-doc.setFontSize(7);doc.setFont(undefined,'normal');doc.setTextColor(100,100,120);doc.text('Civil - Structural - BIM Engineering',15,20);
-// Title
-doc.setFontSize(22);doc.setFont(undefined,'bold');doc.setTextColor(NV[0],NV[1],NV[2]);doc.text('SITE INSPECTION',15,36);doc.text('NOTES',15,47);
-// Project name
-doc.setFontSize(13);doc.setFont(undefined,'normal');var nLines=doc.splitTextToSize(p.name||'',W-25);doc.text(nLines,15,62);
-// Location + date
-var lY=62+nLines.length*6+8;doc.setFontSize(9);doc.setFont(undefined,'bold');doc.setTextColor(CR[0],CR[1],CR[2]);var locLine=((p.location||'').toUpperCase()+(p.location&&p.date?' - ':'')+( p.date||''));doc.text(locLine,15,lY);
-// Thin rule
-doc.setDrawColor(180,180,200);doc.setLineWidth(0.3);doc.line(15,lY+6,W-10,lY+6);
-// Meta grid 2 cols
-var fields=[['CLIENT',p.client],['CONTRACTOR',p.contractor],['CIVIL ENGINEER',p.engineer],['DATE',p.date],['DRAWN BY',p.drawnBy],['CHECKED BY',p.checkedBy],['REVIEWED BY',p.reviewedBy],['REV. NO.',p.revNo],['REFERENCE',p.reference],['',null]];
-var gy=lY+15;
-for(var fi=0;fi<fields.length;fi+=2){for(var c=0;c<2;c++){var f=fields[fi+c];if(!f||!f[0])continue;var x=c===0?15:W/2+5;doc.setFontSize(7);doc.setFont(undefined,'bold');doc.setTextColor(CR[0],CR[1],CR[2]);doc.text(f[0],x,gy);doc.setFontSize(9);doc.setFont(undefined,'normal');doc.setTextColor(NV[0],NV[1],NV[2]);doc.text(f[1]||'--',x,gy+5);}gy+=15;}
-doc.setFontSize(7);doc.setTextColor(160,160,180);doc.text('Generated: '+new Date().toLocaleDateString('en-GB'),15,H-8);
-// Issues pages
-var issues=p.issues||[];if(issues.length){doc.addPage();doc.setFillColor(NV[0],NV[1],NV[2]);doc.rect(0,0,W,18,'F');doc.setFontSize(11);doc.setTextColor(WH[0],WH[1],WH[2]);doc.setFont(undefined,'bold');doc.text('SITE INSPECTION ISSUES',12,12);doc.setFontSize(8);doc.setFont(undefined,'normal');var sN=(p.name||'').slice(0,40);doc.text(sN,W-12,12,{align:'right'});var y=26;for(var ii=0;ii<issues.length;ii++){var iss=issues[ii];var hasPh=!!iss.photo;var rH=hasPh?52:28;if(y+rH>H-14){doc.addPage();doc.setFillColor(NV[0],NV[1],NV[2]);doc.rect(0,0,W,18,'F');doc.setFontSize(11);doc.setTextColor(WH[0],WH[1],WH[2]);doc.setFont(undefined,'bold');doc.text('SITE INSPECTION ISSUES (cont.)',12,12);y=26;}var sc=iss.severity==='Critical'?[185,28,28]:iss.severity==='Major'?[146,64,14]:[22,101,52];doc.setFillColor(ii%2===0?248:255,ii%2===0?249:255,255);doc.rect(10,y-4,W-20,rH,'F');doc.setFillColor(sc[0],sc[1],sc[2]);doc.rect(10,y-4,2.5,rH,'F');doc.setFontSize(7);doc.setTextColor(150,150,170);doc.setFont(undefined,'normal');doc.text('#'+(ii+1),15,y);doc.setFontSize(10);doc.setFont(undefined,'bold');doc.setTextColor(NV[0],NV[1],NV[2]);var tl=doc.splitTextToSize(iss.title||'',hasPh?108:152);doc.text(tl,15,y+5);doc.setFontSize(7);doc.setFont(undefined,'bold');doc.setTextColor(sc[0],sc[1],sc[2]);doc.text(iss.severity||'Minor',W-54,y+5);doc.setTextColor(NV[0],NV[1],NV[2]);doc.text(iss.status||'Open',W-28,y+5);if(iss.description){doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(80,80,100);var dl=doc.splitTextToSize(iss.description,hasPh?108:152);doc.text(dl,15,y+5+tl.length*4+2);}if(iss.assignedTo){doc.setFontSize(7);doc.setTextColor(120,120,140);doc.text('Assigned: '+iss.assignedTo,15,y+rH-8);}doc.setFontSize(7);doc.setTextColor(160,160,180);doc.text(fmtD(iss.createdAt),W-12,y+rH-8,{align:'right'});if(hasPh){try{doc.addImage(iss.photo,'JPEG',W-48,y-2,36,44,undefined,'FAST');}catch(ie){}}y+=rH+3;}var pc=doc.internal.getNumberOfPages();for(var pg=1;pg<=pc;pg++){doc.setPage(pg);doc.setFontSize(7);doc.setTextColor(160,160,180);doc.text('Page '+pg+' of '+pc,W-12,H-5,{align:'right'});}}
-var fn=(p.name||'Report').replace(/[^a-z0-9]/gi,'-').slice(0,40)+'-Inspection-Report.pdf';doc.save(fn);toast('PDF exported!');}catch(err){toast('PDF failed: '+err.message,6000);console.error(err);}}
-
-// ── WORD EXPORT ──────────────────────────────────────────────────────
-function exportWord(){var p=S.projects[S.proj];toast('Generating Word document...',4000);setTimeout(function(){try{var iss=p.issues||[];var rows=iss.map(function(v,i){return'<tr><td style="border:1px solid #ccc;padding:5px;text-align:center;">'+(i+1)+'</td><td style="border:1px solid #ccc;padding:5px;font-weight:bold;">'+esc(v.title)+'</td><td style="border:1px solid #ccc;padding:5px;">'+esc(v.description||'')+'</td><td style="border:1px solid #ccc;padding:5px;color:'+(v.severity==='Critical'?'#b91c1c':v.severity==='Major'?'#92400e':'#166534')+';font-weight:bold;">'+(v.severity||'')+'</td><td style="border:1px solid #ccc;padding:5px;">'+(v.status||'')+'</td><td style="border:1px solid #ccc;padding:5px;">'+esc(v.assignedTo||'')+'</td>'+(v.photo?'<td style="border:1px solid #ccc;padding:3px;"><img src="'+v.photo+'" style="max-width:80px;max-height:60px;"></td>':'<td style="border:1px solid #ccc;padding:5px;color:#999;">--</td>')+'</tr>';}).join('');
-var html='<html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;margin:20mm;}h1,h2{color:#1E2D5E;}table{border-collapse:collapse;width:100%;}th{background:#1E2D5E;color:white;padding:6px;border:1px solid #ccc;font-size:9pt;}td{font-size:9pt;}.g{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0;}.l{font-size:8pt;color:#A51C30;font-weight:bold;text-transform:uppercase;}.v{font-size:10pt;color:#1E2D5E;font-weight:bold;}</style></head><body><div style="border-left:8px solid #1E2D5E;padding-left:16px;margin-bottom:16px;"><div style="font-size:9pt;color:#A51C30;font-weight:bold;">ADROIT BIM CONSULTANTS LTD - SITE INSPECTION NOTES</div><h1 style="margin:6px 0;">'+esc(p.name)+'</h1><div style="color:#A51C30;font-weight:bold;">'+esc(p.location||'')+(p.date?' - '+p.date:'')+'</div></div><hr style="border:1px solid #1E2D5E;"><h2>Project Information</h2><div class="g">'+[['CLIENT',p.client],['CONTRACTOR',p.contractor],['CIVIL ENGINEER',p.engineer],['DATE',p.date],['REFERENCE',p.reference],['REV.',p.revNo]].map(function(f){return'<div><div class="l">'+f[0]+'</div><div class="v">'+esc(f[1]||'--')+'</div></div>';}).join('')+'</div><h2>Document Control</h2><div class="g">'+[['DRAWN BY',p.drawnBy],['CHECKED BY',p.checkedBy],['REVIEWED BY',p.reviewedBy],['REV. NO.',p.revNo]].map(function(f){return'<div><div class="l">'+f[0]+'</div><div class="v">'+esc(f[1]||'--')+'</div></div>';}).join('')+'</div><hr style="border:0.5px solid #ccc;margin:12px 0;"><h2>Site Inspection Issues ('+iss.length+')</h2><table><thead><tr><th>#</th><th>Title</th><th>Description</th><th>Severity</th><th>Status</th><th>Assigned To</th><th>Photo</th></tr></thead><tbody>'+rows+'</tbody></table><p style="margin-top:18px;font-size:8pt;color:#999;">Generated: '+new Date().toLocaleDateString('en-GB')+' - Adroit Site Audit</p></body></html>';
-var blob=new Blob(['\ufeff',html],{type:'application/msword'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download=(p.name||'Report').replace(/[^a-z0-9]/gi,'-').slice(0,40)+'-Inspection-Report.doc';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);toast('Word document exported!');}catch(err){toast('Word export failed: '+err.message,5000);}},120);}
-
-// ── BACKUP / RESTORE ─────────────────────────────────────────────────
-function doBackup(){var blob=new Blob([JSON.stringify({version:3,projects:S.projects,exported:new Date().toISOString()},null,2)],{type:'application/json'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='adroit-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);toast('Backup downloaded');}
-function doRestore(){var inp=document.createElement('input');inp.type='file';inp.accept='.json';inp.onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=async function(ev){try{var d=JSON.parse(ev.target.result);var ps=d.projects||d;if(!Array.isArray(ps)){toast('Invalid backup file');return;}if(!confirm('Replace all data with '+ps.length+' project(s)?'))return;S.projects=ps;await saveDB();renderHome();toast(ps.length+' project(s) restored!');}catch(err){toast('Failed: '+err.message);}};r.readAsText(f);};document.body.appendChild(inp);inp.click();document.body.removeChild(inp);}
-
-// ── HELP ─────────────────────────────────────────────────────────────
-function openHelp(){_hPanel=0;updHelp();document.getElementById('help-ov').classList.add('active');}
-function closeHelp(e){if(!e||e.target===document.getElementById('help-ov'))document.getElementById('help-ov').classList.remove('active');}
-function hNav(d){_hPanel=Math.max(0,Math.min(5,_hPanel+d));updHelp();}
-function updHelp(){for(var i=0;i<6;i++)document.getElementById('hp-'+i).className='hp'+(i===_hPanel?' active':'');document.getElementById('hdots').innerHTML=Array.from({length:6},function(_,i){return'<div class="hdot'+(i===_hPanel?' active':'')+'"></div>';}).join('');var nb=document.getElementById('hn-next');if(_hPanel===5){nb.textContent='Got it';nb.onclick=function(){document.getElementById('help-ov').classList.remove('active');};}else{nb.textContent='Next';nb.onclick=function(){hNav(1);};}}
-
-// ── PWA ───────────────────────────────────────────────────────────────
-function injectPWA(){var m={name:'Adroit Site Audit',short_name:'Adroit',display:'standalone',theme_color:'#ffffff',background_color:'#f4f6fa',start_url:'./'};var blob=new Blob([JSON.stringify(m)],{type:'application/manifest+json'});var lk=document.createElement('link');lk.rel='manifest';lk.href=URL.createObjectURL(blob);document.head.appendChild(lk);}
-
-// ── ANNOTATION ───────────────────────────────────────────────────────
-var _aTool='pen',_aColor='#ef4444',_aWidth=3;
-var _aDrawing=false,_aStart={x:0,y:0};
-var _aHistory=[];
-
-function openAnnotate(){
-  if(!_photo){toast('Add a photo first');return;}
-  var canvas=document.getElementById('annot-canvas');
-  var img=new Image();
-  img.onload=function(){
-    var wrap=document.getElementById('annot-wrap');
-    var mW=wrap.clientWidth||window.innerWidth;
-    var mH=wrap.clientHeight||(window.innerHeight-130);
-    var sc=Math.min(mW/img.width,mH/img.height,1);
-    canvas.width=img.width;
-    canvas.height=img.height;
-    canvas.style.width=Math.round(img.width*sc)+'px';
-    canvas.style.height=Math.round(img.height*sc)+'px';
-    var ctx=canvas.getContext('2d');
-    ctx.drawImage(img,0,0);
-    _aHistory=[ctx.getImageData(0,0,canvas.width,canvas.height)];
-    setupAnnotCanvas(canvas);
-  };
-  img.src=_photo;
-  // Reset tools
-  _aTool='pen';_aColor='#ef4444';_aWidth=3;
-  document.querySelectorAll('.atool').forEach(function(b){b.classList.remove('active');});
-  var pt=document.getElementById('at-pen');if(pt)pt.classList.add('active');
-  document.querySelectorAll('.acol').forEach(function(b){b.classList.remove('active');});
-  var pr=document.getElementById('ac-red');if(pr)pr.classList.add('active');
-  document.getElementById('annot-modal').classList.add('active');
-}
-
-function getAPos(canvas,e){
-  var rect=canvas.getBoundingClientRect();
-  var sx=canvas.width/rect.width,sy=canvas.height/rect.height;
-  var cx=e.touches?e.touches[0].clientX:e.clientX;
-  var cy=e.touches?e.touches[0].clientY:e.clientY;
-  return{x:(cx-rect.left)*sx,y:(cy-rect.top)*sy};
-}
-
-function setupAnnotCanvas(canvas){
-  function start(e){e.preventDefault();_aDrawing=true;var p=getAPos(canvas,e);_aStart={x:p.x,y:p.y};if(_aTool==='pen'){var ctx=canvas.getContext('2d');ctx.beginPath();ctx.moveTo(p.x,p.y);}}
-  function move(e){e.preventDefault();if(!_aDrawing)return;annotDraw(canvas,getAPos(canvas,e));}
-  function end(e){e.preventDefault();if(!_aDrawing)return;_aDrawing=false;annotCommit(canvas);}
-  canvas.ontouchstart=start;canvas.ontouchmove=move;canvas.ontouchend=end;
-  canvas.onmousedown=start;canvas.onmousemove=move;canvas.onmouseup=end;
-}
-
-function annotDraw(canvas,p){
-  var ctx=canvas.getContext('2d');
-  ctx.strokeStyle=_aColor;ctx.lineWidth=_aWidth;ctx.lineCap='round';ctx.lineJoin='round';
-  if(_aTool==='pen'){
-    ctx.lineTo(p.x,p.y);ctx.stroke();
-  } else {
-    if(_aHistory.length)ctx.putImageData(_aHistory[_aHistory.length-1],0,0);
-    ctx.beginPath();
-    if(_aTool==='rect'){
-      ctx.strokeRect(_aStart.x,_aStart.y,p.x-_aStart.x,p.y-_aStart.y);
-    } else if(_aTool==='circle'){
-      var rx=Math.abs(p.x-_aStart.x)/2,ry=Math.abs(p.y-_aStart.y)/2;
-      ctx.ellipse(_aStart.x+(p.x-_aStart.x)/2,_aStart.y+(p.y-_aStart.y)/2,Math.max(rx,1),Math.max(ry,1),0,0,Math.PI*2);
-      ctx.stroke();
-    } else if(_aTool==='arrow'){
-      drawAnnotArrow(ctx,_aStart.x,_aStart.y,p.x,p.y);
-    }
+function renderIssues(){
+  var p=S.projects[S.proj];if(!p)return;
+  var fs=document.getElementById('f-sev').value,ft=document.getElementById('f-stat').value;
+  var vis=(p.issues||[]).filter(function(i){
+    if(fs&&i.severity!==fs)return false;
+    if(ft&&i.status!==ft)return false;
+    return true;
+  });
+  document.getElementById('iss-cnt').textContent=vis.length+' issue'+(vis.length!==1?'s':'');
+  var el=document.getElementById('iss-list');
+  if(!(p.issues||[]).length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">&#128203;</div><div class="empty-t">No issues logged</div><div class="empty-s">Tap &quot;+ Add Issue&quot; to begin</div></div>';
+    return;
   }
+  if(!vis.length){
+    el.innerHTML='<div class="empty"><div class="empty-ico">&#128269;</div><div class="empty-t">No matching issues</div><div class="empty-s">Try changing the filters</div></div>';
+    return;
+  }
+  var html='';
+  vis.forEach(function(iss){
+    var ri=p.issues.indexOf(iss);
+    var sc=iss.status==='Open'?'to':iss.status==='In Progress'?'ti':'tl';
+    var vc=iss.severity==='Critical'?'tc':iss.severity==='Major'?'tm':'tn';
+    var chk=_bulk&&_sel.has(iss.id);
+    var leftEl=_bulk
+      ?'<div class="bchk'+(chk?' checked':'')+'" data-id="'+iss.id+'" data-act="sel"></div>'
+      :'<div class="drag">&#8942;&#8942;</div>';
+    var photoEl=iss.photo
+      ?'<img class="iphoto" data-id="'+iss.id+'" data-act="photo" src="'+iss.photo+'" alt="photo">'
+      :'<div class="nophoto">&#128247;</div>';
+    html+='<div class="icard" draggable="true" ondragstart="dStart(event,'+ri+')" ondragover="dOver(event)" ondrop="dDrop(event,'+ri+')" ondragend="dEnd(event)">'
+      +leftEl
+      +'<div class="ibody">'
+        +'<div class="itop"><div class="ititle">'+esc(iss.title)+'</div>'
+        +'<span class="tag '+vc+'">'+( iss.severity||'Minor')+'</span></div>'
+        +(iss.description?'<div class="idesc">'+esc(iss.description)+'</div>':'')
+        +'<div class="ifooter">'
+          +'<button class="tag '+sc+'" data-idx="'+ri+'" data-act="stat">'+( iss.status||'Open')+'</button>'
+          +(iss.assignedTo?'<span class="asgn">&#8594; '+esc(iss.assignedTo)+'</span>':'')
+          +'<span class="idate">'+fmtD(iss.createdAt)+'</span>'
+        +'</div>'
+        +'<div class="iactions">'
+          +'<button class="btn btn-o btn-sm" data-idx="'+ri+'" data-act="edit">Edit</button>'
+          +'<button class="btn btn-o btn-sm" data-idx="'+ri+'" data-act="up">&#8679;</button>'
+          +'<button class="btn btn-o btn-sm" data-idx="'+ri+'" data-act="dn">&#8681;</button>'
+        +'</div>'
+      +'</div>'
+      +photoEl
+      +'</div>';
+  });
+  el.innerHTML=html;
+  // Delegated event handler
+  el.onclick=function(e){
+    var t=e.target.closest('[data-act]');
+    if(!t)return;
+    var act=t.getAttribute('data-act');
+    var idx=parseInt(t.getAttribute('data-idx'));
+    var id=t.getAttribute('data-id');
+    if(act==='stat'){e.stopPropagation();qStat(idx,e);}
+    else if(act==='edit'){openIssueForm(idx);}
+    else if(act==='up'){moveIss(idx,-1);}
+    else if(act==='dn'){moveIss(idx,1);}
+    else if(act==='sel'){e.stopPropagation();togSel(id,e);}
+    else if(act==='photo'){var iss=p.issues.find(function(i){return i.id===id;});if(iss&&iss.photo){document.getElementById('pm-img').src=iss.photo;document.getElementById('pm').classList.add('active');}}
+  };
 }
 
-function annotCommit(canvas){
-  var ctx=canvas.getContext('2d');
-  _aHistory.push(ctx.getImageData(0,0,canvas.width,canvas.height));
-  if(_aTool==='pen')ctx.beginPath();
-}
-
-function drawAnnotArrow(ctx,x1,y1,x2,y2){
-  var hl=Math.max(_aWidth*5,14);
-  var angle=Math.atan2(y2-y1,x2-x1);
-  ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x2,y2);
-  ctx.lineTo(x2-hl*Math.cos(angle-Math.PI/6),y2-hl*Math.sin(angle-Math.PI/6));
-  ctx.lineTo(x2-hl*Math.cos(angle+Math.PI/6),y2-hl*Math.sin(angle+Math.PI/6));
-  ctx.closePath();ctx.fillStyle=_aColor;ctx.fill();
-}
-
-function annotUndo(){
-  if(_aHistory.length<=1){toast('Nothing to undo');return;}
-  _aHistory.pop();
-  var canvas=document.getElementById('annot-canvas');
-  document.getElementById('annot-canvas').getContext('2d').putImageData(_aHistory[_aHistory.length-1],0,0);
-}
-
-function annotClear(){
-  if(_aHistory.length<1)return;
-  document.getElementById('annot-canvas').getContext('2d').putImageData(_aHistory[0],0,0);
-  _aHistory=[_aHistory[0]];
-}
-
-function annotDone(){
-  _photo=document.getElementById('annot-canvas').toDataURL('image/jpeg',0.88);
-  updPhoto();
-  document.getElementById('annot-modal').classList.remove('active');
-  toast('Annotation saved');
-}
-
-function setATool(t){
-  _aTool=t;
-  document.querySelectorAll('.atool[id^="at-"]').forEach(function(b){b.classList.remove('active');});
-  var el=document.getElementById('at-'+t);if(el)el.classList.add('active');
-}
-
-function setAColor(c,n){
-  _aColor=c;
-  document.querySelectorAll('.acol').forEach(function(b){b.classList.remove('active');});
-  var el=document.getElementById('ac-'+n);if(el)el.classList.add('active');
-}
-
-function setAWidth(w,n){
-  _aWidth=w;
-  ['at-thin','at-thick'].forEach(function(id){var b=document.getElementById(id);if(b)b.classList.remove('active');});
-  var el=document.getElementById('at-'+n);if(el)el.classList.add('active');
-}
-
-// ── INIT ──────────────────────────────────────────────────────────────
-async function init(){injectPWA();await initDB();await loadDB();renderHome();setInterval(updSync,60000);}
-init();
-</script>
-</body>
-</html>
