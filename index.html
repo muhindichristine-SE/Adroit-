@@ -827,11 +827,13 @@ async function exportPDF() {
 
     // ── BRAND BLOCK ─────────────────────────────────────────────────
     var BX=20, BY=20;
-    doc.setFillColor(NV[0],NV[1],NV[2]); doc.rect(BX,BY,5,5,'F');
+    doc.setFillColor(CR[0],CR[1],CR[2]); doc.rect(BX,BY,5,5,'F');  // CRIMSON box
     doc.setFontSize(6.5); doc.setFont(undefined,'bold'); doc.setTextColor(NV[0],NV[1],NV[2]);
     doc.text('ADROIT BIM CONSULTANTS LTD', BX+7, BY+3.5);
-    doc.setFontSize(5); doc.setFont(undefined,'normal'); doc.setTextColor(CR[0],CR[1],CR[2]);
+    doc.setFontSize(5); doc.setFont(undefined,'normal'); doc.setTextColor(NV[0],NV[1],NV[2]);
     doc.text('Civil  ·  Structural  ·  BIM Engineering', BX+7, BY+7);
+    doc.setFontSize(5); doc.setFont(undefined,'italic'); doc.setTextColor(NV[0],NV[1],NV[2]);
+    doc.text('Precision . Coordination . Digital Delivery', BX+7, BY+12);
 
     // ── HERO BLOCK ──────────────────────────────────────────────────
     var HY=85;
@@ -890,13 +892,22 @@ async function exportPDF() {
     var issues = p.issues||[];
     function addHdr(lbl) {
       doc.addPage();
-      doc.setFillColor(NV[0],NV[1],NV[2]); doc.rect(0,0,W,18,'F');
-      doc.setFontSize(11); doc.setTextColor(WH[0],WH[1],WH[2]); doc.setFont(undefined,'bold'); doc.text(lbl,12,12);
-      doc.setFontSize(8); doc.setFont(undefined,'normal'); doc.text((p.name||'').slice(0,40),W-12,12,{align:'right'});
+      doc.setFillColor(NV[0],NV[1],NV[2]); doc.rect(0,0,W,20,'F');
+      doc.setFillColor(CR[0],CR[1],CR[2]); doc.rect(0,0,W,1.2,'F');
+      doc.setFontSize(11); doc.setTextColor(WH[0],WH[1],WH[2]); doc.setFont(undefined,'bold');
+      doc.text(lbl, 12, 10);
+      // Project title — wrap to 2 lines max, right-aligned, smaller font
+      doc.setFontSize(6); doc.setFont(undefined,'normal');
+      var hdrName = p.name || '';
+      var hdrLines = doc.splitTextToSize(hdrName, 90);
+      if (hdrLines.length > 2) hdrLines = hdrLines.slice(0,2);
+      hdrLines.forEach(function(ln, i) {
+        doc.text(ln, W-12, 8 + i*6, {align:'right'});
+      });
     }
     if (issues.length) {
       addHdr('SITE INSPECTION ISSUES');
-      var y = 26;
+      var y = 28;
       var ML=15, MR=15, CW=W-ML-MR;
       var PH_W=78, PH_H=72;
       var DESC_X=ML+PH_W+6, DESC_W=CW-PH_W-6;
