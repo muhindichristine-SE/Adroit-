@@ -944,11 +944,11 @@ async function exportPDF() {
         var iss=issues[ii], hasPh=!!iss.photo;
         var sc2=iss.severity==='Critical'?[185,28,28]:iss.severity==='Major'?[245,158,11]:[22,101,52];
 
-        // Calculate row height — photo rows fixed at ROW_H, no-photo rows dynamic
+        // Calculate row height — photo rows fixed at ROW_H, no-photo rows dynamic full width
         var rH=ROW_H;
         if(!hasPh){
           doc.setFontSize(8);
-          var dl0=iss.description?doc.splitTextToSize(iss.description,DESC_W):[];
+          var dl0=iss.description?doc.splitTextToSize(iss.description,CW):[];
           rH=TITLE_H+ASGN_H+(dl0.length?dl0.length*4.5+6:10)+FOOT_H+6;
           rH=Math.max(rH,30);
         }
@@ -980,18 +980,15 @@ async function exportPDF() {
             doc.text('No description recorded.',DESC_X,contentY+4);
           }
         }else{
-          // No photo — description still at DESC_X for consistent alignment
-          // Show a light vertical rule where photo would be
-          doc.setDrawColor(220,220,228);doc.setLineWidth(0.3);
-          doc.line(ML,contentY,ML+PH_W,contentY);
+          // No photo — full width description, no empty column
           doc.setFont(undefined,'normal');
           if(iss.description){
             doc.setFontSize(8);doc.setTextColor(50,50,70);
-            var dl2=doc.splitTextToSize(iss.description,DESC_W);
-            justifyText(doc,dl2,DESC_X,contentY+4,4.5,DESC_W);
+            var dl2=doc.splitTextToSize(iss.description,CW);
+            justifyText(doc,dl2,ML,contentY+2,4.5,CW);
           }else{
             doc.setFontSize(8);doc.setFont(undefined,'italic');doc.setTextColor(170,170,185);
-            doc.text('No description recorded.',DESC_X,contentY+4);
+            doc.text('No description recorded.',ML,contentY+2);
           }
         }
 
