@@ -786,6 +786,22 @@ async function exportPDF() {
   if (!window.jspdf || !window.jspdf.jsPDF) { toast('PDF library not loaded', 4000); return; }
   toast('Generating PDF...', 7000);
   await new Promise(function(r) { setTimeout(r, 80); });
+  // Justified text helper — full justification
+  function justifyText(d, lines, x, startY, lineH, colW) {
+    lines.forEach(function(line, i) {
+      var isLast = (i === lines.length - 1);
+      if (isLast || line.trim() === '' || line.indexOf(' ') === -1) {
+        d.text(line, x, startY + i * lineH);
+      } else {
+        var words = line.split(' ');
+        var lineW = d.getTextWidth(line.replace(/ /g, ''));
+        var gap = (colW - lineW) / (words.length - 1);
+        var cx = x;
+        words.forEach(function(w) { d.text(w, cx, startY + i * lineH); cx += d.getTextWidth(w) + gap; });
+      }
+    });
+  }
+
   try {
     var p = S.projects[S.proj];
     var doc = new window.jspdf.jsPDF({unit:'mm', format:'a4'});
@@ -920,9 +936,9 @@ async function exportPDF() {
         var rH=ROW_H;
         if(!hasPh){
           doc.setFontSize(8);
-          var dl0=iss.description?doc.splitTextToSize(iss.description,CW):[];
-          rH=TITLE_H+ASGN_H+(dl0.length?dl0.length*4.5+4:8)+FOOT_H+6;
-          rH=Math.max(rH,28);
+          var dl0=iss.description?doc.splitTextToSize(iss.description,DESC_W):[];
+          rH=TITLE_H+ASGN_H+(dl0.length?dl0.length*4.5+6:10)+FOOT_H+6;
+          rH=Math.max(rH,36);
         }
         if(y+rH>H-14){addHdr('SITE INSPECTION ISSUES (cont.)');y=25;}
 
@@ -939,28 +955,31 @@ async function exportPDF() {
         if(hasPh){
           // Photo LEFT — fixed size
           try{doc.addImage(iss.photo,'JPEG',ML,contentY,PH_W,PH_H,undefined,'FAST');}catch(ie){}
-          // Description RIGHT — aligned to TOP of photo
+          // Description RIGHT — always at DESC_X
           doc.setFont(undefined,'normal');
           if(iss.description){
             doc.setFontSize(8);doc.setTextColor(50,50,70);
             var dl=doc.splitTextToSize(iss.description,DESC_W);
             var maxL=Math.floor(PH_H/4.5);
             if(dl.length>maxL)dl=dl.slice(0,maxL).concat(['...']);
-            doc.text(dl, DESC_X, contentY+4); // +4 = one line drop from photo top edge
+            justifyText(doc,dl,DESC_X,contentY+4,4.5,DESC_W);
           }else{
             doc.setFontSize(8);doc.setFont(undefined,'italic');doc.setTextColor(170,170,185);
-            doc.text('No description recorded.', DESC_X, contentY+4);
+            doc.text('No description recorded.',DESC_X,contentY+4);
           }
         }else{
-          // Full width description
+          // No photo — description still at DESC_X for consistent alignment
+          // Show a light vertical rule where photo would be
+          doc.setDrawColor(220,220,228);doc.setLineWidth(0.3);
+          doc.line(ML,contentY,ML+PH_W,contentY);
           doc.setFont(undefined,'normal');
           if(iss.description){
             doc.setFontSize(8);doc.setTextColor(50,50,70);
-            var dl2=doc.splitTextToSize(iss.description,CW);
-            doc.text(dl2,ML,contentY+2);
+            var dl2=doc.splitTextToSize(iss.description,DESC_W);
+            justifyText(doc,dl2,DESC_X,contentY+4,4.5,DESC_W);
           }else{
             doc.setFontSize(8);doc.setFont(undefined,'italic');doc.setTextColor(170,170,185);
-            doc.text('No description recorded.',ML,contentY+2);
+            doc.text('No description recorded.',DESC_X,contentY+4);
           }
         }
 
