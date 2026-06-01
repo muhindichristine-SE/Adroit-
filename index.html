@@ -923,22 +923,26 @@ async function exportPDF() {
       addHdr('SITE INSPECTION ISSUES');
       var y = 25;
       var ML=15, MR=15, CW=W-ML-MR;
-      var PH_W=78, PH_H=72;
+      // Compute ROW_H to fit exactly 2 per page
+      // Available: H(297) - footer(14) - y_start(25) = 258mm
+      // Two issues + gap: 2*ROW_H + 4 <= 258 → ROW_H = 127
+      var ROW_H = 127;
+      var PH_H = 90;   // photo height within row
+      var PH_W = 78;
       var DESC_X=ML+PH_W+6, DESC_W=CW-PH_W-6;
       var TITLE_H=9, ASGN_H=6, FOOT_H=10;
-      var ROW_H=TITLE_H+ASGN_H+PH_H+FOOT_H+8;
 
       for (var ii=0; ii<issues.length; ii++) {
         var iss=issues[ii], hasPh=!!iss.photo;
         var sc2=iss.severity==='Critical'?[185,28,28]:iss.severity==='Major'?[245,158,11]:[22,101,52];
 
-        // Calculate row height
+        // Calculate row height — photo rows fixed at ROW_H, no-photo rows dynamic
         var rH=ROW_H;
         if(!hasPh){
           doc.setFontSize(8);
           var dl0=iss.description?doc.splitTextToSize(iss.description,DESC_W):[];
           rH=TITLE_H+ASGN_H+(dl0.length?dl0.length*4.5+6:10)+FOOT_H+6;
-          rH=Math.max(rH,36);
+          rH=Math.max(rH,30);
         }
         if(y+rH>H-14){addHdr('SITE INSPECTION ISSUES (cont.)');y=25;}
 
@@ -993,7 +997,7 @@ async function exportPDF() {
         // Separator
         doc.setDrawColor(200,200,212);doc.setLineWidth(0.4);
         doc.line(ML,y+rH+2,W-MR,y+rH+2);
-        y+=rH+6;
+        y+=rH+4;
       }
 
       var pc=doc.internal.getNumberOfPages();
