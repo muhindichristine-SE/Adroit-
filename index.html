@@ -786,18 +786,26 @@ async function exportPDF() {
   if (!window.jspdf || !window.jspdf.jsPDF) { toast('PDF library not loaded', 4000); return; }
   toast('Generating PDF...', 7000);
   await new Promise(function(r) { setTimeout(r, 80); });
-  // Justified text helper — full justification
+  // Justified text — skips justification if gap per space would be too wide
   function justifyText(d, lines, x, startY, lineH, colW) {
+    var maxGap = 6; // mm — don't justify if word gap would exceed this
     lines.forEach(function(line, i) {
       var isLast = (i === lines.length - 1);
-      if (isLast || line.trim() === '' || line.indexOf(' ') === -1) {
-        d.text(line, x, startY + i * lineH);
+      var words = line.trim().split(' ').filter(function(w){return w.length>0;});
+      if (isLast || words.length < 3 || line.trim() === '') {
+        d.text(line, x, startY + i * lineH); // last line or too few words — left align
       } else {
-        var words = line.split(' ');
-        var lineW = d.getTextWidth(line.replace(/ /g, ''));
+        var lineW = d.getTextWidth(words.join(''));
         var gap = (colW - lineW) / (words.length - 1);
-        var cx = x;
-        words.forEach(function(w) { d.text(w, cx, startY + i * lineH); cx += d.getTextWidth(w) + gap; });
+        if (gap > maxGap) {
+          d.text(line, x, startY + i * lineH); // gap too wide — left align
+        } else {
+          var cx = x;
+          words.forEach(function(w) {
+            d.text(w, cx, startY + i * lineH);
+            cx += d.getTextWidth(w) + gap;
+          });
+        }
       }
     });
   }
