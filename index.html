@@ -2020,457 +2020,107 @@ async function exportPDF() {
   footerOnPage(currentPage);
 
   // Open PDF preview in a full-screen modal instead of downloading
-  const pdfBlob = doc.output('blob');
-  const pdfUrl  = URL.createObjectURL(pdfBlob);
-  _showPDFPreview(pdfUrl, p.name);
-  // Store doc reference on overlay so page renderer can access it
-  var ov = document.getElementById('pdfPreviewOverlay');
-  if (ov) { ov._pdfDoc = doc; _renderPDFPages(doc, ov.querySelector('div[style*="overflow:auto"]'), ov.querySelector('div[style*="Rendering"]')); }
-  toast('📄 PDF ready — tap Download to save');
+  const pdfDataUri = doc.output('datauristring');
+  const pdfBlob    = doc.output('blob');
+  const pdfBlobUrl = URL.createObjectURL(pdfBlob);
+  _showPDFPreview(pdfDataUri, pdfBlobUrl, p.name);
+  toast('📄 PDF ready!');
   } catch(err) {
     console.error('PDF export error:', err);
     toast('⚠ PDF failed: ' + (err.message || String(err)));
   }
 }
 
-function _showPDFPreview(url, projectName) {
+function _showPDFPreview(dataUri, blobUrl, projectName) {
+  // Remove any existing overlay
   var existing = document.getElementById('pdfPreviewOverlay');
   if (existing) existing.parentNode.removeChild(existing);
 
   var safeName = (projectName || 'Report').replace(/[^a-z0-9]/gi, '-').slice(0, 40) + '-Inspection-Report.pdf';
 
+  // ── Try to open in system PDF viewer first (best on mobile) ──────────
+  // window.open with data URI opens Chrome's built-in PDF viewer on Android
+  var newWin = null;
+  try { newWin = window.open(dataUri, '_blank'); } catch(e) {}
+
+  // ── Always show the overlay as well (fallback + download button) ──────
   var overlay = document.createElement('div');
   overlay.id = 'pdfPreviewOverlay';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:#1a1a2e;display:flex;flex-direction:column;font-family:inherit;';
 
   // Top bar
   var topBar = document.createElement('div');
-  topBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e2d5e;flex-shrink:0;gap:8px;';
+  topBar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 14px;background:#1e2d5e;flex-shrink:0;';
 
-  var title = document.createElement('span');
-  title.style.cssText = 'color:#fff;font-size:14px;font-weight:700;flex:1;';
-  title.textContent = 'PDF Preview';
+  var titleEl = document.createElement('span');
+  titleEl.style.cssText = 'color:#fff;font-size:14px;font-weight:700;flex:1;';
+  titleEl.textContent = 'PDF Preview';
 
+  // Download button — works everywhere
   var dlBtn = document.createElement('a');
-  dlBtn.href = url;
+  dlBtn.href     = blobUrl;
   dlBtn.download = safeName;
-  dlBtn.style.cssText = 'padding:8px 16px;background:#8b1c1c;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap;';
+  dlBtn.style.cssText = 'padding:8px 14px;background:#8b1c1c;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap;';
   dlBtn.textContent = '⬇ Download';
 
-  var closeBtn = document.createElement('button');
-  closeBtn.style.cssText = 'padding:8px 14px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;';
-  closeBtn.textContent = '✕ Close';
-  closeBtn.onclick = function() {
-    overlay.parentNode.removeChild(overlay);
-    URL.revokeObjectURL(url);
+  // Open in viewer button
+  var openBtn = document.createElement('button');
+  openBtn.style.cssText = 'padding:8px 14px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;';
+  openBtn.textContent = '↗ Open';
+  openBtn.onclick = function() {
+    try { window.open(dataUri, '_blank'); } catch(e) { toast('Use the Download button instead'); }
   };
 
-  topBar.appendChild(title);
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'padding:8px 12px;background:rgba(255,255,255,0.1);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;';
+  closeBtn.textContent = '✕';
+  closeBtn.onclick = function() {
+    overlay.parentNode.removeChild(overlay);
+    URL.revokeObjectURL(blobUrl);
+  };
+
+  topBar.appendChild(titleEl);
+  topBar.appendChild(openBtn);
   topBar.appendChild(dlBtn);
   topBar.appendChild(closeBtn);
 
-  // PDF display area
-  var pdfArea = document.createElement('div');
-  pdfArea.style.cssText = 'flex:1;overflow:auto;background:#525659;display:flex;flex-direction:column;align-items:center;padding:12px;gap:10px;';
+  // ── Main content: embed the PDF via <object> tag ──────────────────────
+  // <object> with data URI works on desktop Chrome/Firefox and some mobile browsers
+  var body = document.createElement('div');
+  body.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;';
 
-  // Hint bar
-  var hint = document.createElement('div');
-  hint.style.cssText = 'width:100%;max-width:700px;background:rgba(255,193,7,0.15);border:1px solid rgba(255,193,7,0.4);border-radius:6px;padding:8px 12px;color:#ffc107;font-size:11px;text-align:center;flex-shrink:0;';
-  hint.textContent = 'Tap Download to save the PDF, then open it in your PDF viewer app.';
-  pdfArea.appendChild(hint);
+  var obj = document.createElement('object');
+  obj.setAttribute('data', dataUri);
+  obj.setAttribute('type', 'application/pdf');
+  obj.style.cssText = 'flex:1;width:100%;border:none;background:#525659;';
 
-  // Render each page as a canvas using jsPDF output
-  // We already have the blob url - render pages via pdf.js if available,
-  // otherwise show page-by-page images using jsPDF's built-in page rendering
-  var loadingMsg = document.createElement('div');
-  loadingMsg.style.cssText = 'color:#fff;font-size:14px;margin-top:20px;';
-  loadingMsg.textContent = 'Rendering pages…';
-  pdfArea.appendChild(loadingMsg);
+  // Fallback content inside <object> for browsers that can't render it inline
+  var fallback = document.createElement('div');
+  fallback.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center;';
+  fallback.innerHTML =
+    '<div style="font-size:56px;margin-bottom:16px;">📄</div>' +
+    '<div style="color:#fff;font-size:17px;font-weight:700;margin-bottom:8px;">PDF Generated</div>' +
+    '<div style="color:rgba(255,255,255,0.65);font-size:13px;line-height:1.6;margin-bottom:20px;">' +
+      'Your browser cannot display PDFs inline.<br>' +
+      'Tap <strong style="color:#fbbf24;">↗ Open</strong> to view in your PDF app,<br>' +
+      'or tap <strong style="color:#fbbf24;">⬇ Download</strong> to save the file.' +
+    '</div>';
+
+  obj.appendChild(fallback);
+  body.appendChild(obj);
+
+  // Footer
+  var footer = document.createElement('div');
+  footer.style.cssText = 'padding:7px 14px;background:#1e2d5e;text-align:center;flex-shrink:0;';
+  footer.innerHTML = '<span style="color:rgba(255,255,255,0.5);font-size:11px;">Tap ↗ Open to view · ⬇ Download to save</span>';
 
   overlay.appendChild(topBar);
-  overlay.appendChild(pdfArea);
+  overlay.appendChild(body);
+  overlay.appendChild(footer);
   document.body.appendChild(overlay);
-
-  // Render PDF pages as images using jsPDF's getDataUriString per page
-  // We pass the doc object via a closure stored on the overlay
-  if (overlay._pdfDoc) {
-    _renderPDFPages(overlay._pdfDoc, pdfArea, loadingMsg);
-  } else {
-    // Fallback: show download-only message
-    loadingMsg.innerHTML = '<div style="text-align:center;padding:20px;">' +
-      '<div style="font-size:48px;margin-bottom:12px;">📄</div>' +
-      '<div style="color:#fff;font-size:16px;font-weight:700;margin-bottom:8px;">PDF Ready</div>' +
-      '<div style="color:rgba(255,255,255,0.7);font-size:13px;margin-bottom:20px;">Tap Download to save and view the full report.</div>' +
-      '</div>';
-  }
-}
-
-function _renderPDFPages(doc, container, loadingMsg) {
-  try {
-    loadingMsg.textContent = 'Rendering pages…';
-    var totalPages = doc.internal.getNumberOfPages();
-    var rendered = 0;
-    for (var pg = 1; pg <= totalPages; pg++) {
-      (function(pageNum) {
-        var dataUri = doc.output('datauristring', {pageNumber: pageNum}) ||
-                      doc.output('datauristring');
-        // jsPDF datauristring gives full doc - render as image per page
-        // Use canvas approach: draw each page
-        var pageCanvas = document.createElement('canvas');
-        pageCanvas.style.cssText = 'width:100%;max-width:700px;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,0.4);background:#fff;';
-        var img = new Image();
-        img.onload = function() {
-          pageCanvas.width = img.naturalWidth;
-          pageCanvas.height = img.naturalHeight;
-          pageCanvas.getContext('2d').drawImage(img, 0, 0);
-          rendered++;
-          if (rendered === 1) loadingMsg.remove();
-        };
-        img.src = dataUri;
-        container.appendChild(pageCanvas);
-      })(pg);
-    }
-  } catch(e) {
-    loadingMsg.textContent = 'Preview not available on this device. Use Download to view.';
-  }
-}
-
-// WORD EXPORT
-
-function bindEvents() { function on(id, evt, fn) { var el = document.getElementById(id); if (el) el.addEventListener(evt, fn); } function onQ(sel, evt, fn) { var el = document.querySelector(sel); if (el) el.addEventListener(evt, fn); } function onAll(sel, evt, fn) { document.querySelectorAll(sel).forEach(function(el) { el.addEventListener(evt, fn); }); }
-  onQ('.hh-logo-btn', 'click', goHome); onQ('#screenHome .btn-backup', 'click', exportBackup); on('restoreInput', 'change', importBackup); onQ('#screenNewProject .back-btn', 'click', function(){ showScreen('screenHome'); renderHome(); }); onQ('#screenNewProject .btn-primary', 'click', createProject); onQ('#btnAddIssue', 'click', startAddIssue); onQ('#btnExportModal', 'click', openExportModal); onAll('#screenProject .tab[data-tab]', 'click', function(e) { switchTab(e.currentTarget.getAttribute('data-tab'), e.currentTarget); }); onQ('#screenCamera .back-btn', 'click', function(){ stopCamera(); showScreen('screenProject'); }); on('shutterBtn', 'click', capturePhoto); on('photoUploadInput', 'change', handleUpload); onQ('#screenVoice .back-btn', 'click', function(){ showScreen('screenProject'); }); on('micBtn', 'click', toggleRecording); on('issueAssigned', 'input', showCombo); on('issueAssigned', 'focus', showCombo); on('issueAssigned', 'blur', hideCombo);
-  // Combo option selection via event delegation
-  var dd = document.getElementById('comboDropdown');
-  if (dd) dd.addEventListener('mousedown', function(e) {
-    var opt = e.target.closest('.combo-option[data-val]');
-    if (opt) { e.preventDefault(); pickCombo(opt.getAttribute('data-val')); }
-  }); on('saveIssueBtn', 'click', saveIssue); onQ('#screenAnnotate .back-btn', 'click', function(){ showScreen('screenProject'); }); onAll('#screenAnnotate .tool-btn[data-tool]', 'click', function(e) { setTool(e.currentTarget.getAttribute('data-tool'), e.currentTarget); }); on('tUndoAnn', 'click', undoAnn); onAll('#screenAnnotate .color-dot[data-color]', 'click', function(e) { setAnnColor(e.currentTarget.getAttribute('data-color'), e.currentTarget); }); onAll('#screenAnnotate .color-dot[data-color]', 'touchend', function(e) { e.preventDefault(); setAnnColor(e.currentTarget.getAttribute('data-color'), e.currentTarget); }); onQ('#btnSaveSiteAnnotation', 'click', saveSiteAnnotation); onQ('#btnCancelExport', 'click', closeExportModal);
-  // Inline confirm dialog
-  on('filterSearch', 'input', renderIssues);
-  on('filterSeverity', 'change', renderIssues);
-  on('filterStatus', 'change', renderIssues);
-  on('confirmYes', 'click', function() {
-    var overlay = document.getElementById('confirmOverlay');
-    overlay.classList.remove('open');
-    if (overlay._onYes) { overlay._onYes(); overlay._onYes = null; }
-  });
-  on('confirmNo', 'click', function() {
-    var overlay = document.getElementById('confirmOverlay');
-    overlay.classList.remove('open');
-    overlay._onYes = null;
-  }); onQ('#btnExportPDF', 'click', exportPDF); var issueList = document.getElementById('issueList'); if (issueList) issueList.addEventListener('click', function(e) { var btn = e.target.closest('[data-action]'); if (!btn) return; var idx = parseInt(btn.getAttribute('data-idx'), 10); switch (btn.getAttribute('data-action')) { case 'edit-issue': openEditIssue(idx); break; case 'annotate-issue': openAnnotate(idx); break; case 'delete-issue': deleteIssue(idx); break;
-      case 'cycle-status': cycleIssueStatus(idx); break;
-      case 'bulk-select': toggleBulkItem(idx); break;
-    } });
-  // ── Additional bindings ───────────────────────────────────────
-  on('btnSkipPhoto',    'click', skipPhoto);
-  on('photoUploadInput','change', handleUpload);
-  onQ('#btnSendReport', 'click', openSendModal);
-  onQ('#screenProject .back-btn', 'click', function(){ showScreen('screenHome'); renderHome(); });
-}
-
-async function hhBoot() { _injectPWAManifest(); _registerSW(); bindEvents(); function _updateOffline() {
-  var badge = document.getElementById('offlineBadge'); if (badge) badge.classList.toggle('visible', !navigator.onLine);
-  var stat = document.getElementById('homeStatStatus');
-  var lbl = stat ? stat.parentElement.querySelector('.summary-box-label') : null;
-  if (stat) { stat.textContent = navigator.onLine ? '✓' : '⚡'; stat.style.color = navigator.onLine ? '' : '#d97706'; }
-  if (lbl)  { lbl.textContent  = navigator.onLine ? 'Online' : 'Offline'; }
-} window.addEventListener('online', _updateOffline); window.addEventListener('offline', _updateOffline); _updateOffline(); var dateInput = document.getElementById('np_date'); if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10); try { await _restorePhotosFromIDB(); await reconcileStorage(); } catch(e) { console.error('Boot storage restore error:', e); } finally { renderHome(); showScreen('screenHome'); } }
-if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', hhBoot); } else { hhBoot(); }
-// Safety net: re-render home after 800ms in case storage restore delayed the first render
-setTimeout(function() {
-  var el = document.getElementById('homeAccordion');
-  if (el && el.innerHTML.trim() === '') { renderHome(); }
-}, 800);
-
-
-// ══════════════════════════════════════════════════════════════
-// SYNC INDICATOR
-// ══════════════════════════════════════════════════════════════
-var _syncTimer = null;
-function _setSyncState(state) {
-  var indicator = document.getElementById('syncIndicator');
-  var dot = document.getElementById('syncDot');
-  var label = document.getElementById('syncLabel');
-  if (!indicator) return;
-  indicator.className = 'syncing' === state ? 'syncing' : (state === 'synced' ? 'synced' : 'error');
-  if (state === 'syncing') {
-    dot.className = 'sync-dot spinning';
-    label.textContent = 'Saving…';
-    if (_syncTimer) clearTimeout(_syncTimer);
-  } else if (state === 'synced') {
-    dot.className = 'sync-dot';
-    label.textContent = 'Saved ' + _fmtSyncTime();
-    if (_syncTimer) clearTimeout(_syncTimer);
-    _syncTimer = setTimeout(function(){ indicator.className=''; dot.className='sync-dot'; label.textContent='Saved'; }, 4000);
-  } else {
-    dot.className = 'sync-dot';
-    label.textContent = 'Save error';
-  }
-}
-function _fmtSyncTime() {
-  var d = new Date();
-  return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
-}
-
-// ══════════════════════════════════════════════════════════════
-// STATUS QUICK-CYCLE
-// ══════════════════════════════════════════════════════════════
-var STATUS_CYCLE = ['Open', 'In Progress', 'Closed'];
-function cycleIssueStatus(idx) {
-  var p = S.projects[S.proj];
-  var iss = p.issues[idx];
-  if (!iss) return;
-  var cur = STATUS_CYCLE.indexOf(iss.status);
-  iss.status = STATUS_CYCLE[(cur + 1) % STATUS_CYCLE.length];
-  save();
-  renderIssues();
-  toast('Status → ' + iss.status);
-}
-
-// ══════════════════════════════════════════════════════════════
-// BULK ACTIONS
-// ══════════════════════════════════════════════════════════════
-S.bulkMode = false;
-S.bulkSelected = new Set();
-
-function toggleBulkMode() {
-  S.bulkMode = !S.bulkMode;
-  S.bulkSelected = new Set();
-  _updateBulkBar();
-  renderIssues();
-}
-
-function clearBulkSelect() {
-  S.bulkMode = false;
-  S.bulkSelected = new Set();
-  _updateBulkBar();
-  renderIssues();
-}
-
-function toggleBulkItem(idx) {
-  if (S.bulkSelected.has(idx)) {
-    S.bulkSelected.delete(idx);
-  } else {
-    S.bulkSelected.add(idx);
-  }
-  _updateBulkBar();
-  renderIssues();
-}
-
-function _updateBulkBar() {
-  var bar = document.getElementById('bulkBar');
-  var countEl = document.getElementById('bulkCount');
-  if (!bar) return;
-  var n = S.bulkSelected.size;
-  if (S.bulkMode) {
-    bar.classList.add('visible');
-    countEl.textContent = n + ' selected';
-  } else {
-    bar.classList.remove('visible');
-  }
-}
-
-function bulkSetStatus(newStatus) {
-  if (!S.bulkSelected.size) { toast('No issues selected'); return; }
-  var p = S.projects[S.proj];
-  S.bulkSelected.forEach(function(idx) {
-    if (p.issues[idx]) p.issues[idx].status = newStatus;
-  });
-  save();
-  S.bulkSelected = new Set();
-  _updateBulkBar();
-  renderIssues();
-  toast('✅ ' + newStatus + ' — ' + S.bulkSelected.size + ' issues updated');
-}
-
-function bulkDelete() {
-  var n = S.bulkSelected.size;
-  if (!n) { toast('No issues selected'); return; }
-  showConfirm('Delete ' + n + ' issue' + (n!==1?'s':'') + '?', function() {
-    var p = S.projects[S.proj];
-    var idxArr = Array.from(S.bulkSelected).sort(function(a,b){return b-a;});
-    idxArr.forEach(function(idx) {
-      var iss = p.issues[idx];
-      if (iss) { _deletePhoto('iss_' + iss.id); _deletePhoto('ann_' + iss.id); }
-      p.issues.splice(idx, 1);
-    });
-    save();
-    S.bulkSelected = new Set();
-    S.bulkMode = false;
-    _updateBulkBar();
-    renderIssues();
-    toast('🗑 ' + n + ' issue' + (n!==1?'s':'') + ' deleted');
-  });
-}
-
-// ══════════════════════════════════════════════════════════════
-// DRAG-TO-REORDER
-// ══════════════════════════════════════════════════════════════
-var _dragSrcIdx = null;
-
-function _bindDragHandlers() {
-  var cards = document.querySelectorAll('#issueList .issue-card[data-drag-idx]');
-  cards.forEach(function(card) {
-    card.addEventListener('dragstart', _onDragStart);
-    card.addEventListener('dragover',  _onDragOver);
-    card.addEventListener('dragleave', _onDragLeave);
-    card.addEventListener('drop',      _onDrop);
-    card.addEventListener('dragend',   _onDragEnd);
-  });
-  // Touch drag
-  var handles = document.querySelectorAll('#issueList .drag-handle');
-  handles.forEach(function(handle) {
-    handle.addEventListener('touchstart', _touchDragStart, {passive:false});
-  });
-}
-
-function _onDragStart(e) {
-  if (S.bulkMode) { e.preventDefault(); return; }
-  _dragSrcIdx = parseInt(this.getAttribute('data-real-idx'), 10);
-  this.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', _dragSrcIdx);
-}
-function _onDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  this.classList.add('drag-over');
-}
-function _onDragLeave() { this.classList.remove('drag-over'); }
-function _onDrop(e) {
-  e.preventDefault();
-  this.classList.remove('drag-over');
-  var targetIdx = parseInt(this.getAttribute('data-real-idx'), 10);
-  if (_dragSrcIdx === null || _dragSrcIdx === targetIdx) return;
-  _reorderIssue(_dragSrcIdx, targetIdx);
-}
-function _onDragEnd() {
-  this.classList.remove('dragging');
-  _dragSrcIdx = null;
-}
-
-function _reorderIssue(fromIdx, toIdx) {
-  var p = S.projects[S.proj];
-  var issues = p.issues;
-  var moved = issues.splice(fromIdx, 1)[0];
-  issues.splice(toIdx, 0, moved);
-  // Float critical issues to top if no active filters
-  var sevFilter = (document.getElementById('filterSeverity') || {}).value || '';
-  var staFilter = (document.getElementById('filterStatus') || {}).value || '';
-  var searchQ = ((document.getElementById('filterSearch') || {}).value || '').trim();
-  if (!sevFilter && !staFilter && !searchQ) {
-    // Stable sort: critical first, preserve relative order within each group
-    var critical = issues.filter(function(i){ return i.severity === 'Critical'; });
-    var rest = issues.filter(function(i){ return i.severity !== 'Critical'; });
-    p.issues = critical.concat(rest);
-  }
-  save();
-  renderIssues();
-}
-
-// Touch drag (simplified: tap handle then tap destination)
-var _touchDragCard = null;
-function _touchDragStart(e) {
-  if (S.bulkMode) return;
-  e.preventDefault();
-  var card = e.currentTarget.closest('.issue-card');
-  if (!card) return;
-  if (_touchDragCard) {
-    _touchDragCard.style.outline = '';
-    _touchDragCard = null;
-  }
-  _touchDragCard = card;
-  card.style.outline = '3px solid var(--hh-purple)';
-  toast('Now tap destination card to move here');
-  // Set up tap listener on issue list
-  document.getElementById('issueList').addEventListener('click', _touchDragDrop, {once:true});
-}
-function _touchDragDrop(e) {
-  if (!_touchDragCard) return;
-  var target = e.target.closest('.issue-card');
-  _touchDragCard.style.outline = '';
-  if (target && target !== _touchDragCard) {
-    var fromIdx = parseInt(_touchDragCard.getAttribute('data-real-idx'), 10);
-    var toIdx   = parseInt(target.getAttribute('data-real-idx'), 10);
-    if (!isNaN(fromIdx) && !isNaN(toIdx)) _reorderIssue(fromIdx, toIdx);
-  }
-  _touchDragCard = null;
-}
-
-// ══════════════════════════════════════════════════════════════
-// SERVICE WORKER + PWA MANIFEST (offline support)
-// ══════════════════════════════════════════════════════════════
-function _registerSW() {
-  // Service workers require the script to be served from the same origin with an http/https
-  // URL — blob: URLs are not permitted. For a single-file PWA the SW must be hosted at a
-  // real path (e.g. GitHub Pages as index.html, or any web server).
-  // When served correctly (file named index.html on GitHub Pages or any https origin),
-  // the SW below will be injected into the page and registered automatically.
-  if (!('serviceWorker' in navigator)) return;
-  // Only attempt registration when the page is served over http(s) — not file://
-  if (!location.protocol.startsWith('http')) return;
-
-  // Encode the SW source into the page itself as a script tag, then reference it by path.
-  // This only works when the HTML file IS the origin root (e.g. index.html at /).
-  // For GitHub Pages: repo → Settings → Pages → source branch, file must be index.html.
-  // Inject an inline script element with id="adroit-sw-src" if not already present,
-  // then register it using its src attribute set to sw.js — this only works if the page
-  // is served as index.html and you've saved the SW separately. For a fully self-contained
-  // single-file deployment the most reliable offline strategy is localStorage + IndexedDB
-  // (already implemented). The SW below will register successfully on GitHub Pages when
-  // the file is named index.html.
-  var swPath = './sw.js';
-
-
-  // Attempt registration against sw.js (will succeed on GitHub Pages if sw.js exists)
-  navigator.serviceWorker.register(swPath, {scope: '/'}).then(function(reg) {
-    console.log('[SW] Registered ok, scope:', reg.scope);
-  }).catch(function() {
-    // sw.js not present — silently skip, app still works fully offline via IDB/localStorage
-  });
-}
-
-function _injectPWAManifest() {
-  if (document.querySelector('link[rel="manifest"]')) return;
-  var manifest = {
-    name: 'Adroit Site Audit',
-    short_name: 'Site Audit',
-    description: 'Adroit BIM Site Inspection & Issue Tracker',
-    start_url: location.href,
-    display: 'standalone',
-    background_color: '#1e2d5e',
-    theme_color: '#1e2d5e',
-    orientation: 'portrait-primary',
-    icons: [
-      { src: 'data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 192 192\'><rect width=\'192\' height=\'192\' fill=\'%231e2d5e\'/><text y=\'.9em\' font-size=\'160\'>🏗</text></svg>', sizes: '192x192', type: 'image/svg+xml' }
-    ]
-  };
-  var blob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
-  var link = document.createElement('link');
-  link.rel = 'manifest';
-  link.href = URL.createObjectURL(blob);
-  document.head.appendChild(link);
-  // Theme color meta
-  var meta = document.createElement('meta');
-  meta.name = 'theme-color';
-  meta.content = '#1e2d5e';
-  document.head.appendChild(meta);
-  // Apple PWA tags
-  var appleMeta = document.createElement('meta');
-  appleMeta.name = 'apple-mobile-web-app-capable';
-  appleMeta.content = 'yes';
-  document.head.appendChild(appleMeta);
-  var appleStatus = document.createElement('meta');
-  appleStatus.name = 'apple-mobile-web-app-status-bar-style';
-  appleStatus.content = 'black-translucent';
-  document.head.appendChild(appleStatus);
 }
 
 
-// ══════════════════════════════════════════════════════════════
-// SEND REPORT (email client launcher)
-// ══════════════════════════════════════════════════════════════
 function openSendModal() {
   var p = S.projects[S.proj];
   if (!p) return;
