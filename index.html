@@ -507,38 +507,13 @@ function _loadDocxLib() {
     <div class="action-row" style="margin-bottom:10px;">
       <button class="btn btn-primary btn-block" id="homeNewAuditBtn" onclick="showProjectTypeModal()">New Site Audit</button>
     </div>
-    <div id="homeAccordion">
-      <!-- Skeleton shown while projects load from IndexedDB -->
-      <div id="homeSkeleton">
-        <div class="sk-card">
-          <div class="sk-row">
-            <div class="sk-body">
-              <div class="skeleton sk-line tall med" style="margin-bottom:10px;"></div>
-              <div class="skeleton sk-line short"></div>
-            </div>
-            <div class="skeleton sk-badge"></div>
-          </div>
-        </div>
-        <div class="sk-card">
-          <div class="sk-row">
-            <div class="sk-body">
-              <div class="skeleton sk-line tall med" style="margin-bottom:10px;"></div>
-              <div class="skeleton sk-line short"></div>
-            </div>
-            <div class="skeleton sk-badge"></div>
-          </div>
-        </div>
-        <div class="sk-card">
-          <div class="sk-row">
-            <div class="sk-body">
-              <div class="skeleton sk-line tall" style="width:55%;margin-bottom:10px;"></div>
-              <div class="skeleton sk-line short"></div>
-            </div>
-            <div class="skeleton sk-badge"></div>
-          </div>
-        </div>
-      </div>
+    <!-- Skeleton loader — sits outside homeAccordion so innerHTML swap is clean -->
+    <div id="homeSkeleton">
+      <div class="sk-card"><div class="sk-row"><div class="sk-body"><div class="skeleton sk-line tall med" style="margin-bottom:10px;"></div><div class="skeleton sk-line short"></div></div><div class="skeleton sk-badge"></div></div></div>
+      <div class="sk-card"><div class="sk-row"><div class="sk-body"><div class="skeleton sk-line tall med" style="margin-bottom:10px;"></div><div class="skeleton sk-line short"></div></div><div class="skeleton sk-badge"></div></div></div>
+      <div class="sk-card"><div class="sk-row"><div class="sk-body"><div class="skeleton sk-line tall" style="width:55%;margin-bottom:10px;"></div><div class="skeleton sk-line short"></div></div><div class="skeleton sk-badge"></div></div></div>
     </div>
+    <div id="homeAccordion"></div>
     <div style="display:flex;gap:6px;margin-top:14px;padding-bottom:4px;">
       <button class="btn btn-secondary btn-backup" style="flex:1;font-size:12px;padding:7px 10px;" onclick="exportBackup()">Backup</button>
       <label class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px 10px;text-align:center;cursor:pointer;">Restore<input type="file" accept=".json" id="restoreInput" style="display:none;" onchange="importBackup(event)"></label>
@@ -609,31 +584,13 @@ function _loadDocxLib() {
     <button class="bulk-btn danger" onclick="bulkDelete()">🗑 Delete</button>
     <button class="bulk-btn" style="background:rgba(255,255,255,0.2);" onclick="clearBulkSelect()">✕</button>
   </div>
-  <div id="tabIssues"><div id="issueList">
-      <!-- Skeleton shown while issues load -->
-      <div id="issueSkeleton">
-        <div class="sk-card">
-          <div class="sk-row">
-            <div class="sk-thumb skeleton"></div>
-            <div class="sk-body">
-              <div class="skeleton sk-line tall full" style="margin-bottom:8px;"></div>
-              <div class="skeleton sk-line full" style="margin-bottom:6px;"></div>
-              <div class="skeleton sk-line med"></div>
-            </div>
-          </div>
-        </div>
-        <div class="sk-card">
-          <div class="sk-row">
-            <div class="sk-thumb skeleton"></div>
-            <div class="sk-body">
-              <div class="skeleton sk-line tall full" style="margin-bottom:8px;"></div>
-              <div class="skeleton sk-line full" style="margin-bottom:6px;"></div>
-              <div class="skeleton sk-line short"></div>
-            </div>
-          </div>
-        </div>
+  <div id="tabIssues">
+      <div id="issueSkeleton" style="display:none;">
+        <div class="sk-card"><div class="sk-row"><div class="sk-thumb skeleton"></div><div class="sk-body"><div class="skeleton sk-line tall full" style="margin-bottom:8px;"></div><div class="skeleton sk-line full" style="margin-bottom:6px;"></div><div class="skeleton sk-line med"></div></div></div></div>
+        <div class="sk-card"><div class="sk-row"><div class="sk-thumb skeleton"></div><div class="sk-body"><div class="skeleton sk-line tall full" style="margin-bottom:8px;"></div><div class="skeleton sk-line full" style="margin-bottom:6px;"></div><div class="skeleton sk-line short"></div></div></div></div>
       </div>
-    </div></div>
+      <div id="issueList"></div>
+    </div>
   <div id="tabSummary" style="display:none;"><div id="summaryContent"></div></div>
 </div>
 
@@ -1527,7 +1484,7 @@ function renderSummary() {
 }
 
 // CAMERA
-async function startAddIssue() {
+async async function startAddIssue() {
   S.photo = null; S.gps = null; showScreen('screenCamera');
   if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => { S.gps = { lat: pos.coords.latitude.toFixed(5), lng: pos.coords.longitude.toFixed(5) }; });
   try {
