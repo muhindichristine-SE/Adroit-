@@ -462,8 +462,22 @@ function _loadDocxLib() {
 <!-- HOME -->
 <div class="screen active" id="screenHome">
   <div style="padding-top:8px;">
-    <p class="page-title">Site Audit</p>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;margin-top:4px;">
+      <div style="width:4px;height:36px;background:#8b1c1c;border-radius:2px;flex-shrink:0;"></div>
+      <div>
+        <p class="page-title" style="margin:0;">Site Audit</p>
+        <p style="font-size:11px;color:#8b1c1c;font-weight:700;letter-spacing:0.5px;margin:0;">ADROIT BIM CONSULTANTS LTD</p>
+      </div>
+    </div>
     <p class="page-sub">Capture observations, photos, assigned actions, summaries, and export Adroit reports.</p>
+    <div id="homeSummaryGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 10px;">
+      <div class="summary-box"><div class="summary-box-num" id="homeStatProjects">0</div><div class="summary-box-label">Projects</div></div>
+      <div class="summary-box"><div class="summary-box-num amber" id="homeStatFindings">0</div><div class="summary-box-label">Findings</div></div>
+      <div class="summary-box"><div class="summary-box-num green">B</div><div class="summary-box-label">Site Audit</div></div>
+    </div>
+    <div class="action-row" style="margin-bottom:10px;">
+      <button class="btn btn-primary btn-block" id="homeNewAuditBtn" onclick="showProjectTypeModal()">New Site Audit</button>
+    </div>
     <div id="homeAccordion"></div>
     <div style="display:flex;gap:6px;margin-top:14px;padding-bottom:4px;">
       <button class="btn btn-secondary btn-backup" style="flex:1;font-size:12px;padding:7px 10px;">Backup</button>
@@ -1177,11 +1191,13 @@ function renderHome() {
   var el = document.getElementById('homeAccordion'); if (!el) return;
   var auditProjects = S.projects.filter(function(p){ return p.type !== 'recon'; });
   var auditIssues = auditProjects.reduce(function(sum,p){ return sum + (p.issues ? p.issues.length : 0); }, 0);
-  var html = '<div class="summary-grid"><div class="summary-box"><div class="summary-box-num">' + auditProjects.length + '</div><div class="summary-box-label">Projects</div></div><div class="summary-box"><div class="summary-box-num amber">' + auditIssues + '</div><div class="summary-box-label">Findings</div></div><div class="summary-box"><div class="summary-box-num green">B</div><div class="summary-box-label">Site Audit</div></div></div>';
-  html += '<div class="action-row"><button class="btn btn-primary btn-block" id="homeNewAuditBtn">New Site Audit</button></div>';
+  // Update stat counters (elements are static in HTML)
+  var sp = document.getElementById('homeStatProjects'); if (sp) sp.textContent = auditProjects.length;
+  var sf = document.getElementById('homeStatFindings'); if (sf) sf.textContent = auditIssues;
+  var html = '';
   if (auditProjects.length === 0) html += '<div class="empty"><div class="empty-h">No site audits yet</div><div class="empty-p">Create a Site Audit project to begin capturing findings.</div></div>';
   else auditProjects.forEach(function(p) { var idx=S.projects.indexOf(p), cnt=p.issues?p.issues.length:0, crit=p.issues?p.issues.filter(function(iss){return iss.severity==='Critical';}).length:0, last=p.date?new Date(p.date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):''; html += '<div class="card" data-action="open-audit" data-idx="'+idx+'"><div class="card-header" style="display:flex;align-items:flex-start;gap:10px;"><div style="flex:1;"><div class="card-title">'+safe(p.name)+'</div><div class="card-meta">'+(p.client?'<span class="meta-pill">Client: '+safe(p.client)+'</span>':'')+(p.location?'<span class="meta-pill">Location: '+safe(p.location)+'</span>':'')+(last?'<span class="meta-pill">Date: '+safe(last)+'</span>':'')+'</div></div><span class="issue-count"'+(crit>0?' style="background:#fee2e2;color:#991b1b;"':'')+'>'+cnt+(crit>0?' / '+crit+' critical':'')+'</span></div></div>'; });
-  el.innerHTML = html; var newBtn = document.getElementById('homeNewAuditBtn'); if (newBtn) newBtn.addEventListener('click', showProjectTypeModal);
+  el.innerHTML = html;
   el.querySelectorAll('[data-action="open-audit"]').forEach(function(item) { item.addEventListener('click', function() { openProject(parseInt(item.getAttribute('data-idx'), 10)); }); });
 }
 function showProjectTypeModal() { showScreen('screenNewProject'); }
@@ -1960,8 +1976,13 @@ function _showPDFPreview(url, projectName) {
 
 // WORD EXPORT
 
-async function hhBoot() { _injectPWAManifest(); _registerSW(); bindEvents(); function _updateOffline() { var badge = document.getElementById('offlineBadge'); if (badge) badge.classList.toggle('visible', !navigator.onLine); } window.addEventListener('online', _updateOffline); window.addEventListener('offline', _updateOffline); _updateOffline(); var dateInput = document.getElementById('np_date'); if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10); try { await _restorePhotosFromIDB(); await reconcileStorage(); } catch(e) { console.error('Boot storage restore error:', e); } renderHome(); showScreen('screenHome'); }
+async function hhBoot() { _injectPWAManifest(); _registerSW(); bindEvents(); function _updateOffline() { var badge = document.getElementById('offlineBadge'); if (badge) badge.classList.toggle('visible', !navigator.onLine); } window.addEventListener('online', _updateOffline); window.addEventListener('offline', _updateOffline); _updateOffline(); var dateInput = document.getElementById('np_date'); if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10); try { await _restorePhotosFromIDB(); await reconcileStorage(); } catch(e) { console.error('Boot storage restore error:', e); } finally { renderHome(); showScreen('screenHome'); } }
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', hhBoot); } else { hhBoot(); }
+// Safety net: re-render home after 800ms in case storage restore delayed the first render
+setTimeout(function() {
+  var el = document.getElementById('homeAccordion');
+  if (el && el.innerHTML.trim() === '') { renderHome(); }
+}, 800);
 
 
 // ══════════════════════════════════════════════════════════════
