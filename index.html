@@ -502,7 +502,7 @@ function _loadDocxLib() {
     <div class="form-group"><label>Contractor</label><input id="np_contractor" type="text" placeholder="e.g. Byte Projects Limited"></div>
     <div class="form-group"><label>Consultant</label><input id="np_consultant" type="text" placeholder="e.g. Adroit BIM Consultants Ltd"></div>
     <div class="form-group"><label>Compiled By</label><input id="np_compiledby" type="text" placeholder="e.g. Christine Muhindi"></div>
-    <div class="form-group" style="margin-bottom:0;"><label>Lead Consultant</label><input id="np_leadconsultant" type="text" placeholder="e.g. Kevin M. Mugo"></div>
+    <div class="form-group" style="margin-bottom:0;"><label>Lead Consultant</label><input id="np_leadconsultant" type="text" placeholder="e.g. Eng. Daniel Thiong'o"></div>
   </div>
   <button class="btn btn-primary btn-block">Create Project →</button>
 </div>
@@ -510,8 +510,13 @@ function _loadDocxLib() {
 <!-- PROJECT DETAIL -->
 <div class="screen" id="screenProject">
   <div class="project-stripe" id="projectStripe">
-    <p class="project-stripe-title" id="pTitle">Project</p>
-    <div class="project-stripe-meta" id="pMeta"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+      <div style="flex:1;">
+        <p class="project-stripe-title" id="pTitle">Project</p>
+        <div class="project-stripe-meta" id="pMeta"></div>
+      </div>
+      <button id="btnEditProject" onclick="openEditProject()" style="flex-shrink:0;padding:5px 12px;background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;margin-top:2px;">✎ Edit</button>
+    </div>
   </div>
   <div class="action-row">
     <button class="btn btn-primary" id="btnAddIssue" style="flex:1;font-size:15px;">📷 Add Issue</button>
@@ -711,6 +716,52 @@ function _loadDocxLib() {
     <div style="display:flex;gap:10px;margin-top:14px;">
       <button class="btn btn-secondary" onclick="closeSendModal()" style="flex:1;">Cancel</button>
       <button class="btn btn-primary" onclick="doSendEmail()" style="flex:2;">Open Email App ↗</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- HELP FAB + SHEET -->
+<button id="helpFab" onclick="openHelp()" style="position:fixed;bottom:22px;right:18px;width:46px;height:46px;border-radius:50%;background:#1e2d5e;color:#fff;border:none;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 4px 14px rgba(30,45,94,0.45);z-index:800;display:flex;align-items:center;justify-content:center;">?</button>
+
+<div id="helpOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:flex-end;">
+  <div id="helpSheet" style="background:#fff;border-radius:20px 20px 0 0;padding:22px 20px 36px;width:100%;max-height:78vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <span style="font-size:17px;font-weight:800;color:#1e2d5e;">How It Works</span>
+      <button onclick="closeHelp()" style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280;">✕</button>
+    </div>
+    <div id="helpPages">
+      <div class="help-page active" id="hp0">
+        <h3 style="color:#1e2d5e;font-size:15px;margin-bottom:8px;">📋 Projects</h3>
+        <p style="font-size:13px;color:#4b5563;line-height:1.65;">Tap <strong>New Site Audit</strong> to create a project. Fill in the client, location, contractor, consultant and date. Tap <strong>✎ Edit</strong> on the project header to update these details at any time.</p>
+      </div>
+      <div class="help-page" id="hp1">
+        <h3 style="color:#1e2d5e;font-size:15px;margin-bottom:8px;">📷 Adding Issues</h3>
+        <p style="font-size:13px;color:#4b5563;line-height:1.65;">Tap <strong>📷 Add Issue</strong> to log a finding. Take a photo or upload one — or tap <strong>Skip photo</strong> to add a comment-only issue. Speak your note using the mic button or type it. Set severity and who it's assigned to.</p>
+      </div>
+      <div class="help-page" id="hp2">
+        <h3 style="color:#1e2d5e;font-size:15px;margin-bottom:8px;">✏️ Annotating Photos</h3>
+        <p style="font-size:13px;color:#4b5563;line-height:1.65;">On any issue with a photo tap <strong>✏ Annotate</strong>. Draw arrows, circles, rectangles or freehand. Pick colours and line thickness. Tap <strong>↩ Undo</strong> to step back one stroke at a time. Tap <strong>Save Annotations</strong> when done.</p>
+      </div>
+      <div class="help-page" id="hp3">
+        <h3 style="color:#1e2d5e;font-size:15px;margin-bottom:8px;">🔄 Status &amp; Reordering</h3>
+        <p style="font-size:13px;color:#4b5563;line-height:1.65;">Tap the coloured status badge on any issue card to cycle <strong>Open → In Progress → Closed</strong> instantly. Drag the <strong>⠿</strong> handle to reorder issues. Tap <strong>☐ Select</strong> for bulk close or delete.</p>
+      </div>
+      <div class="help-page" id="hp4">
+        <h3 style="color:#1e2d5e;font-size:15px;margin-bottom:8px;">📄 Exporting</h3>
+        <p style="font-size:13px;color:#4b5563;line-height:1.65;">Tap <strong>📄 PDF Preview</strong> to generate and preview the full report. Tap <strong>⬇ Download</strong> in the preview to save it. Tap <strong>📧 Send</strong> to open your email app with the report details pre-filled.</p>
+      </div>
+      <div class="help-page" id="hp5">
+        <h3 style="color:#1e2d5e;font-size:15px;margin-bottom:8px;">💾 Backup &amp; Restore</h3>
+        <p style="font-size:13px;color:#4b5563;line-height:1.65;">All data is stored only on this device. Tap <strong>Backup</strong> regularly to download a JSON file. If you ever clear your browser or switch devices, tap <strong>Restore</strong> and pick your backup file to recover everything.</p>
+      </div>
+    </div>
+    <!-- Dots -->
+    <div id="helpDots" style="display:flex;justify-content:center;gap:7px;margin:16px 0;"></div>
+    <!-- Nav -->
+    <div style="display:flex;gap:10px;">
+      <button onclick="helpNav(-1)" style="flex:1;padding:10px;border-radius:9px;border:1.5px solid #e5e7eb;background:#fff;font-size:13px;font-weight:700;cursor:pointer;color:#1e2d5e;">← Back</button>
+      <button id="helpNextBtn" onclick="helpNav(1)" style="flex:2;padding:10px;border-radius:9px;border:none;background:#1e2d5e;color:#fff;font-size:13px;font-weight:700;cursor:pointer;">Next →</button>
     </div>
   </div>
 </div>
@@ -1200,13 +1251,69 @@ function renderHome() {
   el.innerHTML = html;
   el.querySelectorAll('[data-action="open-audit"]').forEach(function(item) { item.addEventListener('click', function() { openProject(parseInt(item.getAttribute('data-idx'), 10)); }); });
 }
+
+function openEditProject() {
+  var p = S.projects[S.proj];
+  if (!p) return;
+  // Pre-fill the new project form with existing data
+  document.getElementById('np_name').value        = p.name        || '';
+  document.getElementById('np_client').value      = p.client      || '';
+  document.getElementById('np_location').value    = p.location    || '';
+  document.getElementById('np_docno').value       = p.docno       || '';
+  document.getElementById('np_inspno').value      = p.inspno      || '';
+  document.getElementById('np_date').value        = p.date        || '';
+  document.getElementById('np_contractor').value  = p.contractor  || '';
+  document.getElementById('np_consultant').value  = p.consultant  || '';
+  document.getElementById('np_compiledby').value  = p.compiledBy  || '';
+  document.getElementById('np_leadconsultant').value = p.leadConsultant || '';
+  document.getElementById('np_checkedby') && (document.getElementById('np_checkedby').value = p.checkedBy || '');
+  document.getElementById('np_reviewedby') && (document.getElementById('np_reviewedby').value = p.reviewedBy || '');
+  // Mark form as editing existing project
+  S.editingProject = true;
+  // Update form title and button
+  var formTitle = document.querySelector('#screenNewProject .page-title');
+  if (formTitle) formTitle.textContent = 'Edit Project';
+  var saveBtn = document.querySelector('#screenNewProject .btn-primary');
+  if (saveBtn) saveBtn.textContent = 'Save Changes';
+  showScreen('screenNewProject');
+}
+
 function showProjectTypeModal() { showScreen('screenNewProject'); }
 
 function createProject() {
   const name = document.getElementById('np_name').value.trim(); if (!name) { toast('Project name required'); return; }
   const dateInput = document.getElementById('np_date').value;
-  const p = { id: Date.now(), type: 'audit', name, client: document.getElementById('np_client').value.trim(), location: document.getElementById('np_location').value.trim(), docno: document.getElementById('np_docno').value.trim(), inspno: document.getElementById('np_inspno').value.trim(), date: dateInput ? new Date(dateInput + 'T00:00:00').toISOString() : new Date().toISOString(), contractor: document.getElementById('np_contractor').value.trim(), consultant: document.getElementById('np_consultant').value.trim() || 'Adroit BIM Consultants Ltd', compiledBy: document.getElementById('np_compiledby').value.trim(), leadConsultant: document.getElementById('np_leadconsultant').value.trim(), issues: [] };
-  S.projects.unshift(p); save(); ['np_name','np_client','np_location','np_docno','np_inspno','np_date','np_contractor','np_consultant','np_compiledby','np_leadconsultant'].forEach(id => document.getElementById(id).value = ''); openProject(0); toast('Project created');
+  const fields = {
+    name, client: document.getElementById('np_client').value.trim(),
+    location: document.getElementById('np_location').value.trim(),
+    docno: document.getElementById('np_docno').value.trim(),
+    inspno: document.getElementById('np_inspno').value.trim(),
+    date: dateInput ? new Date(dateInput + 'T00:00:00').toISOString() : new Date().toISOString(),
+    contractor: document.getElementById('np_contractor').value.trim(),
+    consultant: document.getElementById('np_consultant').value.trim() || 'Adroit BIM Consultants Ltd',
+    compiledBy: document.getElementById('np_compiledby').value.trim(),
+    leadConsultant: document.getElementById('np_leadconsultant').value.trim()
+  };
+  if (S.editingProject && S.proj >= 0) {
+    // Update existing project — preserve id, issues, createdAt
+    Object.assign(S.projects[S.proj], fields);
+    S.editingProject = false;
+    var formTitle = document.querySelector('#screenNewProject .page-title');
+    if (formTitle) formTitle.textContent = 'New Project';
+    var saveBtn = document.querySelector('#screenNewProject .btn-primary');
+    if (saveBtn) saveBtn.textContent = 'Create Project';
+    save();
+    ['np_name','np_client','np_location','np_docno','np_inspno','np_date','np_contractor','np_consultant','np_compiledby','np_leadconsultant'].forEach(id => { var el = document.getElementById(id); if (el) el.value = ''; });
+    openProject(S.proj);
+    toast('✅ Project updated');
+  } else {
+    const p = Object.assign({ id: Date.now(), type: 'audit', issues: [], createdAt: Date.now() }, fields);
+    S.projects.unshift(p);
+    save();
+    ['np_name','np_client','np_location','np_docno','np_inspno','np_date','np_contractor','np_consultant','np_compiledby','np_leadconsultant'].forEach(id => { var el = document.getElementById(id); if (el) el.value = ''; });
+    openProject(0);
+    toast('✅ Project created');
+  }
 }
 
 function openProject(idx) {
@@ -1547,7 +1654,11 @@ function openAnnotate(idx) {
     annCtx.clearRect(0, 0, canvas.width, canvas.height);
     if (iss.annotations) {
       const prev = new Image();
-      prev.onload = () => annCtx.drawImage(prev, 0, 0, canvas.width, canvas.height);
+      prev.onload = () => {
+      annCtx.drawImage(prev, 0, 0, canvas.width, canvas.height);
+      // Push initial state so first undo restores original photo
+      S.annHistory = [annCtx.getImageData(0, 0, canvas.width, canvas.height)];
+    };
       prev.src = iss.annotations;
     }
     canvas.addEventListener('mousedown',  _annMouseDown);
@@ -1585,7 +1696,7 @@ function annEnd() { S.isDrawing=false; S.penPts=[]; }
 function drawArrow(fx,fy,tx,ty,lw) { const hl=18*(lw/3),angle=Math.atan2(ty-fy,tx-fx); annCtx.beginPath(); annCtx.moveTo(fx,fy); annCtx.lineTo(tx,ty); annCtx.stroke(); annCtx.beginPath(); annCtx.moveTo(tx,ty); annCtx.lineTo(tx-hl*Math.cos(angle-Math.PI/6),ty-hl*Math.sin(angle-Math.PI/6)); annCtx.lineTo(tx-hl*Math.cos(angle+Math.PI/6),ty-hl*Math.sin(angle+Math.PI/6)); annCtx.closePath(); annCtx.fill(); }
 function setTool(t,btn) { S.annTool=t; document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
 function setAnnColor(c,el) { S.annColor=c; document.querySelectorAll('.color-dot').forEach(d=>d.classList.remove('active')); el.classList.add('active'); }
-function undoAnn() { if (!S.annHistory.length) return; const c=document.getElementById('annotationCanvas'); annCtx.putImageData(S.annHistory.pop(),0,0); }
+function undoAnn() { if (S.annHistory.length <= 1) { toast('Nothing to undo'); return; } S.annHistory.pop(); const c=document.getElementById('annotationCanvas'); if (c && annCtx) annCtx.putImageData(S.annHistory[S.annHistory.length - 1], 0, 0); }
 // ── SITE AUDIT ANNOTATION SAVE (separate from pre-bid version below) ──
 function annotDone() { saveSiteAnnotation(); }
 function saveSiteAnnotation() {
@@ -1912,6 +2023,9 @@ async function exportPDF() {
   const pdfBlob = doc.output('blob');
   const pdfUrl  = URL.createObjectURL(pdfBlob);
   _showPDFPreview(pdfUrl, p.name);
+  // Store doc reference on overlay so page renderer can access it
+  var ov = document.getElementById('pdfPreviewOverlay');
+  if (ov) { ov._pdfDoc = doc; _renderPDFPages(doc, ov.querySelector('div[style*="overflow:auto"]'), ov.querySelector('div[style*="Rendering"]')); }
   toast('📄 PDF ready — tap Download to save');
   } catch(err) {
     console.error('PDF export error:', err);
@@ -1931,48 +2045,94 @@ function _showPDFPreview(url, projectName) {
 
   // Top bar
   var topBar = document.createElement('div');
-  topBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e2d5e;flex-shrink:0;';
+  topBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e2d5e;flex-shrink:0;gap:8px;';
 
   var title = document.createElement('span');
-  title.style.cssText = 'color:#fff;font-size:14px;font-weight:700;';
+  title.style.cssText = 'color:#fff;font-size:14px;font-weight:700;flex:1;';
   title.textContent = 'PDF Preview';
-
-  var btnRow = document.createElement('div');
-  btnRow.style.cssText = 'display:flex;gap:8px;';
 
   var dlBtn = document.createElement('a');
   dlBtn.href = url;
   dlBtn.download = safeName;
-  dlBtn.style.cssText = 'padding:8px 16px;background:#8b1c1c;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;';
-  dlBtn.textContent = 'Download';
+  dlBtn.style.cssText = 'padding:8px 16px;background:#8b1c1c;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap;';
+  dlBtn.textContent = '⬇ Download';
 
   var closeBtn = document.createElement('button');
-  closeBtn.style.cssText = 'padding:8px 14px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;';
-  closeBtn.textContent = 'Close';
+  closeBtn.style.cssText = 'padding:8px 14px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;';
+  closeBtn.textContent = '✕ Close';
   closeBtn.onclick = function() {
     overlay.parentNode.removeChild(overlay);
     URL.revokeObjectURL(url);
   };
 
-  btnRow.appendChild(dlBtn);
-  btnRow.appendChild(closeBtn);
   topBar.appendChild(title);
-  topBar.appendChild(btnRow);
+  topBar.appendChild(dlBtn);
+  topBar.appendChild(closeBtn);
 
-  // iframe
-  var iframe = document.createElement('iframe');
-  iframe.src = url;
-  iframe.style.cssText = 'flex:1;border:none;width:100%;background:#fff;';
+  // PDF display area
+  var pdfArea = document.createElement('div');
+  pdfArea.style.cssText = 'flex:1;overflow:auto;background:#525659;display:flex;flex-direction:column;align-items:center;padding:12px;gap:10px;';
 
-  // Footer hint
-  var footer = document.createElement('div');
-  footer.style.cssText = 'padding:7px 14px;background:#1e2d5e;text-align:center;flex-shrink:0;';
-  footer.innerHTML = '<span style="color:rgba(255,255,255,0.55);font-size:11px;">Scroll to read all pages · Tap Download to save</span>';
+  // Hint bar
+  var hint = document.createElement('div');
+  hint.style.cssText = 'width:100%;max-width:700px;background:rgba(255,193,7,0.15);border:1px solid rgba(255,193,7,0.4);border-radius:6px;padding:8px 12px;color:#ffc107;font-size:11px;text-align:center;flex-shrink:0;';
+  hint.textContent = 'Tap Download to save the PDF, then open it in your PDF viewer app.';
+  pdfArea.appendChild(hint);
+
+  // Render each page as a canvas using jsPDF output
+  // We already have the blob url - render pages via pdf.js if available,
+  // otherwise show page-by-page images using jsPDF's built-in page rendering
+  var loadingMsg = document.createElement('div');
+  loadingMsg.style.cssText = 'color:#fff;font-size:14px;margin-top:20px;';
+  loadingMsg.textContent = 'Rendering pages…';
+  pdfArea.appendChild(loadingMsg);
 
   overlay.appendChild(topBar);
-  overlay.appendChild(iframe);
-  overlay.appendChild(footer);
+  overlay.appendChild(pdfArea);
   document.body.appendChild(overlay);
+
+  // Render PDF pages as images using jsPDF's getDataUriString per page
+  // We pass the doc object via a closure stored on the overlay
+  if (overlay._pdfDoc) {
+    _renderPDFPages(overlay._pdfDoc, pdfArea, loadingMsg);
+  } else {
+    // Fallback: show download-only message
+    loadingMsg.innerHTML = '<div style="text-align:center;padding:20px;">' +
+      '<div style="font-size:48px;margin-bottom:12px;">📄</div>' +
+      '<div style="color:#fff;font-size:16px;font-weight:700;margin-bottom:8px;">PDF Ready</div>' +
+      '<div style="color:rgba(255,255,255,0.7);font-size:13px;margin-bottom:20px;">Tap Download to save and view the full report.</div>' +
+      '</div>';
+  }
+}
+
+function _renderPDFPages(doc, container, loadingMsg) {
+  try {
+    loadingMsg.textContent = 'Rendering pages…';
+    var totalPages = doc.internal.getNumberOfPages();
+    var rendered = 0;
+    for (var pg = 1; pg <= totalPages; pg++) {
+      (function(pageNum) {
+        var dataUri = doc.output('datauristring', {pageNumber: pageNum}) ||
+                      doc.output('datauristring');
+        // jsPDF datauristring gives full doc - render as image per page
+        // Use canvas approach: draw each page
+        var pageCanvas = document.createElement('canvas');
+        pageCanvas.style.cssText = 'width:100%;max-width:700px;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,0.4);background:#fff;';
+        var img = new Image();
+        img.onload = function() {
+          pageCanvas.width = img.naturalWidth;
+          pageCanvas.height = img.naturalHeight;
+          pageCanvas.getContext('2d').drawImage(img, 0, 0);
+          rendered++;
+          if (rendered === 1) loadingMsg.remove();
+        };
+        img.src = dataUri;
+        container.appendChild(pageCanvas);
+      })(pg);
+    }
+  } catch(e) {
+    loadingMsg.textContent = 'Preview not available on this device. Use Download to view.';
+  }
 }
 
 // WORD EXPORT
@@ -2379,5 +2539,56 @@ function doSendEmail() {
   toast('Opening your email app...');
 }
 
+
+
+// ══ HELP / WALKTHROUGH ════════════════════════════════════════
+var _helpPage = 0;
+var _helpTotal = 6;
+
+function openHelp() {
+  _helpPage = 0;
+  _renderHelp();
+  var ov = document.getElementById('helpOverlay');
+  ov.style.display = 'flex';
+}
+function closeHelp() {
+  document.getElementById('helpOverlay').style.display = 'none';
+}
+function helpNav(dir) {
+  _helpPage = Math.max(0, Math.min(_helpTotal - 1, _helpPage + dir));
+  _renderHelp();
+}
+function _renderHelp() {
+  for (var i = 0; i < _helpTotal; i++) {
+    var pg = document.getElementById('hp' + i);
+    if (pg) pg.style.display = i === _helpPage ? 'block' : 'none';
+  }
+  // Dots
+  var dots = document.getElementById('helpDots');
+  if (dots) {
+    dots.innerHTML = '';
+    for (var j = 0; j < _helpTotal; j++) {
+      var d = document.createElement('div');
+      d.style.cssText = 'width:8px;height:8px;border-radius:50%;background:' + (j === _helpPage ? '#1e2d5e' : '#d1d5db') + ';';
+      dots.appendChild(d);
+    }
+  }
+  // Next/Got it button
+  var nb = document.getElementById('helpNextBtn');
+  if (nb) {
+    if (_helpPage === _helpTotal - 1) {
+      nb.textContent = 'Got it ✓';
+      nb.onclick = closeHelp;
+    } else {
+      nb.textContent = 'Next →';
+      nb.onclick = function() { helpNav(1); };
+    }
+  }
+}
+// Close help when tapping overlay background
+document.addEventListener('click', function(e) {
+  var ov = document.getElementById('helpOverlay');
+  if (e.target === ov) closeHelp();
+});
 
 </script>
