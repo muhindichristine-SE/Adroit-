@@ -501,7 +501,7 @@ function _loadDocxLib() {
   </div>
   <div class="action-row">
     <button class="btn btn-primary" id="btnAddIssue" style="flex:1;font-size:15px;">📷 Add Issue</button>
-    <button class="btn btn-secondary" id="btnExportModal">📄 Export PDF</button>
+    <button class="btn btn-secondary" id="btnExportModal">📄 PDF Preview</button>
   </div>
   <div class="tabs">
     <button class="tab active" data-tab="issues">Issues</button>
@@ -640,7 +640,7 @@ function _loadDocxLib() {
     <div class="form-group"><label>Document / Report No.</label><input id="ex_docno" type="text"></div>
     <div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;">
       <button class="btn btn-secondary" id="btnCancelExport" style="flex:1;min-width:80px;">Cancel</button>
-      <button class="btn btn-primary" id="btnExportPDF" style="flex:2;min-width:100px;">📄 PDF</button>
+      <button class="btn btn-primary" id="btnExportPDF" style="flex:2;min-width:100px;">📄 Preview PDF</button>
       <button class="btn btn-secondary" id="btnAuditExportWord" style="flex:2;min-width:100px;border-color:#2b579a;color:#2b579a;">📝 Word</button>
       <button class="btn btn-secondary" id="btnSendReport" style="flex:2;min-width:100px;border-color:var(--hh-crimson);color:var(--hh-crimson);">📧 Send</button>
     </div>
@@ -1900,12 +1900,71 @@ async function exportPDF() {
 
   footerOnPage(currentPage);
 
-  doc.save(`${p.name.replace(/\s+/g,'-')}-Inspection-Report.pdf`);
-  toast('📄 PDF exported!');
+  // Open PDF preview in a full-screen modal instead of downloading
+  const pdfBlob = doc.output('blob');
+  const pdfUrl  = URL.createObjectURL(pdfBlob);
+  _showPDFPreview(pdfUrl, p.name);
+  toast('📄 PDF ready — tap Download to save');
   } catch(err) {
     console.error('PDF export error:', err);
     toast('⚠ PDF failed: ' + (err.message || String(err)));
   }
+}
+
+function _showPDFPreview(url, projectName) {
+  var existing = document.getElementById('pdfPreviewOverlay');
+  if (existing) existing.parentNode.removeChild(existing);
+
+  var safeName = (projectName || 'Report').replace(/[^a-z0-9]/gi, '-').slice(0, 40) + '-Inspection-Report.pdf';
+
+  var overlay = document.createElement('div');
+  overlay.id = 'pdfPreviewOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:#1a1a2e;display:flex;flex-direction:column;font-family:inherit;';
+
+  // Top bar
+  var topBar = document.createElement('div');
+  topBar.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#1e2d5e;flex-shrink:0;';
+
+  var title = document.createElement('span');
+  title.style.cssText = 'color:#fff;font-size:14px;font-weight:700;';
+  title.textContent = 'PDF Preview';
+
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;';
+
+  var dlBtn = document.createElement('a');
+  dlBtn.href = url;
+  dlBtn.download = safeName;
+  dlBtn.style.cssText = 'padding:8px 16px;background:#8b1c1c;color:#fff;border-radius:7px;font-size:13px;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:5px;';
+  dlBtn.textContent = 'Download';
+
+  var closeBtn = document.createElement('button');
+  closeBtn.style.cssText = 'padding:8px 14px;background:rgba(255,255,255,0.15);color:#fff;border:none;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer;';
+  closeBtn.textContent = 'Close';
+  closeBtn.onclick = function() {
+    overlay.parentNode.removeChild(overlay);
+    URL.revokeObjectURL(url);
+  };
+
+  btnRow.appendChild(dlBtn);
+  btnRow.appendChild(closeBtn);
+  topBar.appendChild(title);
+  topBar.appendChild(btnRow);
+
+  // iframe
+  var iframe = document.createElement('iframe');
+  iframe.src = url;
+  iframe.style.cssText = 'flex:1;border:none;width:100%;background:#fff;';
+
+  // Footer hint
+  var footer = document.createElement('div');
+  footer.style.cssText = 'padding:7px 14px;background:#1e2d5e;text-align:center;flex-shrink:0;';
+  footer.innerHTML = '<span style="color:rgba(255,255,255,0.55);font-size:11px;">Scroll to read all pages · Tap Download to save</span>';
+
+  overlay.appendChild(topBar);
+  overlay.appendChild(iframe);
+  overlay.appendChild(footer);
+  document.body.appendChild(overlay);
 }
 
 // WORD EXPORT
