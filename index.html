@@ -443,6 +443,35 @@ function _loadDocxLib() {
   .critical-float-badge { font-size:10px; color:var(--hh-red); font-weight:700;
     background:#fee2e2; border-radius:4px; padding:1px 5px; margin-left:4px; letter-spacing:0.3px; }
 
+
+  /* ══ SKELETON LOADERS ══════════════════════════════════════════ */
+  @keyframes shimmer {
+    0%   { background-position: -600px 0; }
+    100% { background-position:  600px 0; }
+  }
+  .skeleton {
+    background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+    background-size: 600px 100%;
+    animation: shimmer 1.4s infinite linear;
+    border-radius: 6px;
+  }
+  .sk-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .sk-line  { height: 12px; margin-bottom: 8px; }
+  .sk-line.tall  { height: 16px; }
+  .sk-line.short { width: 40%; }
+  .sk-line.med   { width: 65%; }
+  .sk-line.full  { width: 100%; }
+  .sk-thumb { width: 72px; height: 72px; border-radius: 8px; flex-shrink: 0; }
+  .sk-row   { display: flex; gap: 10px; align-items: flex-start; }
+  .sk-body  { flex: 1; }
+  .sk-badge { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; }
+
 </style>
 </head>
 <body>
@@ -478,10 +507,41 @@ function _loadDocxLib() {
     <div class="action-row" style="margin-bottom:10px;">
       <button class="btn btn-primary btn-block" id="homeNewAuditBtn" onclick="showProjectTypeModal()">New Site Audit</button>
     </div>
-    <div id="homeAccordion"></div>
+    <div id="homeAccordion">
+      <!-- Skeleton shown while projects load from IndexedDB -->
+      <div id="homeSkeleton">
+        <div class="sk-card">
+          <div class="sk-row">
+            <div class="sk-body">
+              <div class="skeleton sk-line tall med" style="margin-bottom:10px;"></div>
+              <div class="skeleton sk-line short"></div>
+            </div>
+            <div class="skeleton sk-badge"></div>
+          </div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-row">
+            <div class="sk-body">
+              <div class="skeleton sk-line tall med" style="margin-bottom:10px;"></div>
+              <div class="skeleton sk-line short"></div>
+            </div>
+            <div class="skeleton sk-badge"></div>
+          </div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-row">
+            <div class="sk-body">
+              <div class="skeleton sk-line tall" style="width:55%;margin-bottom:10px;"></div>
+              <div class="skeleton sk-line short"></div>
+            </div>
+            <div class="skeleton sk-badge"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <div style="display:flex;gap:6px;margin-top:14px;padding-bottom:4px;">
       <button class="btn btn-secondary btn-backup" style="flex:1;font-size:12px;padding:7px 10px;" onclick="exportBackup()">Backup</button>
-      <label class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px 10px;text-align:center;cursor:pointer;">Restore<input type="file" accept=".json" id="restoreInput" style="display:none;"></label>
+      <label class="btn btn-secondary" style="flex:1;font-size:12px;padding:7px 10px;text-align:center;cursor:pointer;">Restore<input type="file" accept=".json" id="restoreInput" style="display:none;" onchange="importBackup(event)"></label>
     </div>
     <p style="font-size:11px;color:#9ca3af;text-align:center;margin-top:8px;padding-bottom:8px;">All Site Audit data is stored only on this device. Clearing browser data will erase projects.</p>
   </div>
@@ -504,7 +564,7 @@ function _loadDocxLib() {
     <div class="form-group"><label>Compiled By</label><input id="np_compiledby" type="text" placeholder="e.g. Christine Muhindi"></div>
     <div class="form-group" style="margin-bottom:0;"><label>Lead Consultant</label><input id="np_leadconsultant" type="text" placeholder="e.g. Eng. Daniel Thiong'o"></div>
   </div>
-  <button class="btn btn-primary btn-block">Create Project →</button>
+  <button class="btn btn-primary btn-block" onclick="createProject()">Create Project →</button>
 </div>
 
 <!-- PROJECT DETAIL -->
@@ -519,7 +579,7 @@ function _loadDocxLib() {
     </div>
   </div>
   <div class="action-row">
-    <button class="btn btn-primary" id="btnAddIssue" style="flex:1;font-size:15px;">📷 Add Issue</button>
+    <button class="btn btn-primary" id="btnAddIssue" style="flex:1;font-size:15px;" onclick="startAddIssue()">📷 Add Issue</button>
     <button class="btn btn-secondary" id="btnExportModal">📄 PDF Preview</button>
   </div>
   <div class="tabs">
@@ -549,7 +609,31 @@ function _loadDocxLib() {
     <button class="bulk-btn danger" onclick="bulkDelete()">🗑 Delete</button>
     <button class="bulk-btn" style="background:rgba(255,255,255,0.2);" onclick="clearBulkSelect()">✕</button>
   </div>
-  <div id="tabIssues"><div id="issueList"></div></div>
+  <div id="tabIssues"><div id="issueList">
+      <!-- Skeleton shown while issues load -->
+      <div id="issueSkeleton">
+        <div class="sk-card">
+          <div class="sk-row">
+            <div class="sk-thumb skeleton"></div>
+            <div class="sk-body">
+              <div class="skeleton sk-line tall full" style="margin-bottom:8px;"></div>
+              <div class="skeleton sk-line full" style="margin-bottom:6px;"></div>
+              <div class="skeleton sk-line med"></div>
+            </div>
+          </div>
+        </div>
+        <div class="sk-card">
+          <div class="sk-row">
+            <div class="sk-thumb skeleton"></div>
+            <div class="sk-body">
+              <div class="skeleton sk-line tall full" style="margin-bottom:8px;"></div>
+              <div class="skeleton sk-line full" style="margin-bottom:6px;"></div>
+              <div class="skeleton sk-line short"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div></div>
   <div id="tabSummary" style="display:none;"><div id="summaryContent"></div></div>
 </div>
 
@@ -616,7 +700,7 @@ function _loadDocxLib() {
     <div class="form-group"><label>Severity</label><select id="issueSeverity"><option>Minor</option><option selected>Moderate</option><option>Critical</option></select></div>
     <div class="form-group" style="margin-bottom:0;"><label>Status</label><select id="issueStatus"><option selected>Open</option><option>In Progress</option><option>Closed</option></select></div>
   </div>
-  <button class="btn btn-primary btn-block" id="saveIssueBtn">✓ Save Issue</button>
+  <button class="btn btn-primary btn-block" id="saveIssueBtn" onclick="saveIssue()">✓ Save Issue</button>
 </div>
 
 <!-- ANNOTATE -->
@@ -658,7 +742,7 @@ function _loadDocxLib() {
     <div class="modal-grid"><div class="form-group"><label>Compiled By</label><input id="ex_compiledby" type="text"></div><div class="form-group"><label>Lead Consultant</label><input id="ex_leadconsultant" type="text"></div></div>
     <div class="form-group"><label>Document / Report No.</label><input id="ex_docno" type="text"></div>
     <div style="display:flex;gap:10px;margin-top:8px;">
-      <button class="btn btn-secondary" id="btnCancelExport" style="flex:1;">Cancel</button>
+      <button class="btn btn-secondary" id="btnCancelExport" style="flex:1;" onclick="closeExportModal()">Cancel</button>
       <button class="btn btn-primary" id="btnExportPDF" style="flex:2;">📄 Preview PDF</button>
       <button class="btn btn-secondary" id="btnSendReport" style="flex:2;border-color:var(--hh-crimson);color:var(--hh-crimson);">📧 Send</button>
     </div>
@@ -1240,6 +1324,9 @@ function showScreen(id) { document.querySelectorAll('.screen').forEach(function(
 function goHome() { showScreen('screenHome'); renderHome(); }
 function renderHome() {
   var el = document.getElementById('homeAccordion'); if (!el) return;
+  // Hide skeleton once real content is ready
+  var sk = document.getElementById('homeSkeleton');
+  if (sk) sk.style.display = 'none';
   var auditProjects = S.projects.filter(function(p){ return p.type !== 'recon'; });
   var auditIssues = auditProjects.reduce(function(sum,p){ return sum + (p.issues ? p.issues.length : 0); }, 0);
   // Update stat counters (elements are static in HTML)
@@ -1319,6 +1406,9 @@ function createProject() {
 function openProject(idx) {
   S.proj = idx;
   S.bulkMode = false; S.bulkSelected = new Set();
+  // Briefly show issue skeleton while render fires
+  var sk = document.getElementById('issueSkeleton');
+  if (sk) sk.style.display = 'block';
   const p = S.projects[idx];
   document.getElementById('pTitle').textContent = p.name;
   document.getElementById('pMeta').innerHTML = [p.client && `👤 ${safe(p.client)}`, p.location && `📍 ${safe(p.location)}`, p.inspno && `📋 ${safe(p.inspno)}`].filter(Boolean).map(t => `<span>${t}</span>`).join('');
@@ -1338,6 +1428,8 @@ function switchTab(tab, btn) {
 function renderIssues() {
   const p = S.projects[S.proj];
   const el = document.getElementById('issueList');
+  var sk = document.getElementById('issueSkeleton');
+  if (sk) sk.style.display = 'none';
   // Apply filters
   var sevFilter = (document.getElementById('filterSeverity') || {}).value || '';
   var staFilter = (document.getElementById('filterStatus') || {}).value || '';
