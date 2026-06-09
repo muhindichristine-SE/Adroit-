@@ -473,7 +473,7 @@ function _loadDocxLib() {
     <div id="homeSummaryGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 10px;">
       <div class="summary-box"><div class="summary-box-num" id="homeStatProjects">0</div><div class="summary-box-label">Projects</div></div>
       <div class="summary-box"><div class="summary-box-num amber" id="homeStatFindings">0</div><div class="summary-box-label">Findings</div></div>
-      <div class="summary-box"><div class="summary-box-num green">B</div><div class="summary-box-label">Site Audit</div></div>
+      <div class="summary-box"><div class="summary-box-num green" id="homeStatStatus">✓</div><div class="summary-box-label">Online</div></div>
     </div>
     <div class="action-row" style="margin-bottom:10px;">
       <button class="btn btn-primary btn-block" id="homeNewAuditBtn" onclick="showProjectTypeModal()">New Site Audit</button>
@@ -1976,7 +1976,13 @@ function _showPDFPreview(url, projectName) {
 
 // WORD EXPORT
 
-async function hhBoot() { _injectPWAManifest(); _registerSW(); bindEvents(); function _updateOffline() { var badge = document.getElementById('offlineBadge'); if (badge) badge.classList.toggle('visible', !navigator.onLine); } window.addEventListener('online', _updateOffline); window.addEventListener('offline', _updateOffline); _updateOffline(); var dateInput = document.getElementById('np_date'); if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10); try { await _restorePhotosFromIDB(); await reconcileStorage(); } catch(e) { console.error('Boot storage restore error:', e); } finally { renderHome(); showScreen('screenHome'); } }
+async function hhBoot() { _injectPWAManifest(); _registerSW(); bindEvents(); function _updateOffline() {
+  var badge = document.getElementById('offlineBadge'); if (badge) badge.classList.toggle('visible', !navigator.onLine);
+  var stat = document.getElementById('homeStatStatus');
+  var lbl = stat ? stat.parentElement.querySelector('.summary-box-label') : null;
+  if (stat) { stat.textContent = navigator.onLine ? '✓' : '⚡'; stat.style.color = navigator.onLine ? '' : '#d97706'; }
+  if (lbl)  { lbl.textContent  = navigator.onLine ? 'Online' : 'Offline'; }
+} window.addEventListener('online', _updateOffline); window.addEventListener('offline', _updateOffline); _updateOffline(); var dateInput = document.getElementById('np_date'); if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10); try { await _restorePhotosFromIDB(); await reconcileStorage(); } catch(e) { console.error('Boot storage restore error:', e); } finally { renderHome(); showScreen('screenHome'); } }
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', hhBoot); } else { hhBoot(); }
 // Safety net: re-render home after 800ms in case storage restore delayed the first render
 setTimeout(function() {
