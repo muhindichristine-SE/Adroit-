@@ -2318,7 +2318,28 @@ function bindEvents() { function on(id, evt, fn) { var el = document.getElementB
 
 
 
-async function hhBoot() { _injectPWAManifest(); _registerSW(); bindEvents(); function _updateOffline() { var badge = document.getElementById('offlineBadge'); if (badge) badge.classList.toggle('visible', !navigator.onLine); } window.addEventListener('online', _updateOffline); window.addEventListener('offline', _updateOffline); _updateOffline(); var dateInput = document.getElementById('np_date'); if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10); try { await _restorePhotosFromIDB(); await reconcileStorage(); } catch(e) { console.error('Boot storage restore error:', e); } renderHome(); showScreen('screenHome'); }
+async function hhBoot() { _injectPWAManifest(); _registerSW(); bindEvents(); function _updateOffline() { var badge = document.getElementById('offlineBadge'); if (badge) badge.classList.toggle('visible', !navigator.onLine); } window.addEventListener('online', _updateOffline); window.addEventListener('offline', _updateOffline); _updateOffline(); var dateInput = document.getElementById('np_date'); if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10); try {
+    // Timeout: if IDB takes more than 3s, render anyway with localStorage data
+    await Promise.race([
+      (async () => { await _restorePhotosFromIDB(); await reconcileStorage(); })(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('IDB timeout')), 3000))
+    ]);
+  } catch(e) {
+    console.warn('Boot storage restore skipped:', e.message);
+  }
+  renderHome();
+  showScreen('screenHome');
+}
 if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', hhBoot); } else { hhBoot(); }
+// Absolute failsafe: hide skeleton after 5s no matter what
+setTimeout(function() {
+  var sk = document.getElementById('homeSkeleton');
+  if (sk) sk.style.display = 'none';
+  var isk = document.getElementById('issueSkeleton');
+  if (isk) isk.style.display = 'none';
+  // If homeAccordion is still empty, render now
+  var acc = document.getElementById('homeAccordion');
+  if (acc && acc.innerHTML.trim() === '') renderHome();
+}, 5000);
 
 </script>
