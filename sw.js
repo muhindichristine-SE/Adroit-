@@ -1,7 +1,7 @@
-// Adroit Site Audit — Service Worker v4
+// Adroit Site Audit — Service Worker v7
 // Place this file at the root of your GitHub Pages repo alongside index.html
 
-const CACHE_NAME = 'adroit-site-audit-v4';
+const CACHE_NAME = 'adroit-site-audit-v7';
 
 // Core files to cache on install
 const PRECACHE = [
@@ -19,7 +19,7 @@ self.addEventListener('install', event => {
   );
 });
 
-// ── Activate: clear old caches ────────────────────────────────
+// ── Activate: clear ALL old caches and take control immediately ──
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -28,17 +28,17 @@ self.addEventListener('activate', event => {
           .filter(key => key !== CACHE_NAME)
           .map(key => caches.delete(key))
       )
-    ).then(() => self.clients.claim())  // take control of all open tabs immediately
+    ).then(() => self.clients.claim())
   );
 });
 
-// ── Fetch: cache-first for app shell, network-first for everything else ──
+// ── Fetch: NETWORK-FIRST for the app shell, so you always get the ──
+// ── latest index.html immediately. Falls back to cache only if offline. ──
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
-  // Cache-first for the app shell (index.html + jsPDF CDN)
   const isShell = url.pathname.endsWith('index.html')
     || url.pathname === '/'
     || url.pathname.endsWith('sw.js')
@@ -46,25 +46,15 @@ self.addEventListener('fetch', event => {
 
   if (isShell) {
     event.respondWith(
-      caches.match(event.request).then(cached => {
-        if (cached) {
-          // Return cache immediately, but refresh in background
-          fetch(event.request).then(fresh => {
-            if (fresh && fresh.status === 200) {
-              caches.open(CACHE_NAME).then(c => c.put(event.request, fresh));
-            }
-          }).catch(() => {});
-          return cached;
-        }
-        // Not cached yet — fetch and cache
-        return fetch(event.request).then(res => {
-          if (res && res.status === 200) {
-            const clone = res.clone();
+      fetch(event.request, { cache: 'no-store' })
+        .then(fresh => {
+          if (fresh && fresh.status === 200) {
+            const clone = fresh.clone();
             caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
           }
-          return res;
-        });
-      })
+          return fresh;
+        })
+        .catch(() => caches.match(event.request))  // offline fallback
     );
     return;
   }
