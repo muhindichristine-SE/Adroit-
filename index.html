@@ -1484,7 +1484,7 @@ function renderSummary() {
 }
 
 // CAMERA
-async async function startAddIssue() {
+async function startAddIssue() {
   S.photo = null; S.gps = null; showScreen('screenCamera');
   if (navigator.geolocation) navigator.geolocation.getCurrentPosition(pos => { S.gps = { lat: pos.coords.latitude.toFixed(5), lng: pos.coords.longitude.toFixed(5) }; });
   try {
