@@ -1046,6 +1046,59 @@ const S = {
 };
 
 // save() — strips photos from localStorage copy, keeps them in IDB
+
+// ── Sync status indicator (no-op safe stub — visual feedback only) ──
+function _setSyncState(state) {
+  var dot = document.getElementById('syncDot');
+  var label = document.getElementById('syncLabel');
+  if (!dot && !label) return;
+  if (dot) dot.style.background = state === 'error' ? '#dc2626' : (state === 'synced' ? '#16a34a' : '#9ca3af');
+  if (label) label.textContent = state === 'error' ? 'Save failed' : (state === 'synced' ? 'Saved' : 'Saving…');
+}
+
+// ── Drag-to-reorder issue cards (safe stub if drag handles aren't present) ──
+function _bindDragHandlers() {
+  var cards = document.querySelectorAll('#issueList .issue-card[draggable="true"]');
+  if (!cards.length) return;
+  var dragSrc = null;
+  cards.forEach(function(card) {
+    card.addEventListener('dragstart', function(e) { dragSrc = card; e.dataTransfer.effectAllowed = 'move'; });
+    card.addEventListener('dragover', function(e) { e.preventDefault(); });
+    card.addEventListener('drop', function(e) {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === card) return;
+      var p = S.projects[S.proj]; if (!p) return;
+      var fromIdx = parseInt(dragSrc.getAttribute('data-idx'), 10);
+      var toIdx = parseInt(card.getAttribute('data-idx'), 10);
+      if (isNaN(fromIdx) || isNaN(toIdx)) return;
+      var moved = p.issues.splice(fromIdx, 1)[0];
+      p.issues.splice(toIdx, 0, moved);
+      save(); renderIssues();
+    });
+  });
+}
+
+// ── Quick status cycle: Open → In Progress → Closed → Open ──
+function cycleIssueStatus(idx) {
+  var p = S.projects[S.proj]; if (!p || !p.issues[idx]) return;
+  var order = ['Open', 'In Progress', 'Closed'];
+  var cur = order.indexOf(p.issues[idx].status);
+  p.issues[idx].status = order[(cur + 1) % order.length];
+  save(); renderIssues();
+}
+
+// ── Bulk select toggle for an individual issue ──
+var _bulkSelected = new Set();
+function toggleBulkItem(idx) {
+  if (_bulkSelected.has(idx)) _bulkSelected.delete(idx); else _bulkSelected.add(idx);
+  renderIssues();
+}
+function toggleBulkMode() {
+  _bulkSelected.clear();
+  toast('Bulk select mode — tap issues to select, then use actions below');
+  renderIssues();
+}
+
 async function save() {
   // Pseudo-transaction: track every IDB photo write so we can roll back
   // if the subsequent localStorage write fails, preventing dangling references.
@@ -2318,7 +2371,7 @@ function bindEvents() { function on(id, evt, fn) { var el = document.getElementB
 
 
 
-async function hhBoot() { _injectPWAManifest(); _registerSW(); bindEvents(); function _updateOffline() { var badge = document.getElementById('offlineBadge'); if (badge) badge.classList.toggle('visible', !navigator.onLine); } window.addEventListener('online', _updateOffline); window.addEventListener('offline', _updateOffline); _updateOffline(); var dateInput = document.getElementById('np_date'); if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10); try {
+async function hhBoot() { bindEvents(); function _updateOffline() { var badge = document.getElementById('offlineBadge'); if (badge) badge.classList.toggle('visible', !navigator.onLine); } window.addEventListener('online', _updateOffline); window.addEventListener('offline', _updateOffline); _updateOffline(); var dateInput = document.getElementById('np_date'); if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0,10); try {
     // Timeout: if IDB takes more than 3s, render anyway with localStorage data
     await Promise.race([
       (async () => { await _restorePhotosFromIDB(); await reconcileStorage(); })(),
