@@ -145,7 +145,8 @@ textarea.inp{resize:vertical;}
 @keyframes mascotPoint{to{transform:rotate(38deg);}}
 /* thumbs-up flash before opening help */
 #mascot-grp.thumbs #mascot-svg{animation:mascotThumb .3s ease;}
-@keyframes mascotThumb{0%{transform:translateY(0);}50%{transform:translateY(-5px) scale(1.06);}100%{transform:translateY(0);}}
+#mascot-grp.completed #mascot-svg{opacity:.5;filter:grayscale(1);}
+#mascot-grp.completed .mascot-bubble{opacity:0;pointer-events:none;}
 /* blink */
 #mascot-eyes{animation:mascotBlink 5s steps(1) infinite;}
 @keyframes mascotBlink{0%,96%,100%{opacity:1;}97%,99%{opacity:0;}}
@@ -1257,8 +1258,10 @@ function mascotEligible(){
   return true;
 }
 function showMascot(){
+  console.log('[showMascot] called, visible='+_mascotVisible+', eligible='+mascotEligible());
   if(_mascotVisible || !mascotEligible()) return;
   _mascotVisible=true;
+  console.log('[showMascot] displaying mascot');
   var g=document.getElementById('mascot-grp');
   g.classList.add('show','enter');
   // wave finishes ~1.5s in, then point
@@ -1272,17 +1275,17 @@ function hideMascot(cb){
 }
 // Arm first-launch entrance only if user hasn't interacted; else wait for idle gap
 function armMascotEntrance(){
-  if(!mascotEligible()) return;
+  console.log('[armMascotEntrance] called');
+  if(!mascotEligible()){ console.log('[mascot] not eligible on load', {seen:_onb.seen, dismissedAt:_onb.dismissedAt, version:_onb.version, current:ONBOARDING_VERSION}); return; }
+  console.log('[mascot] eligible, arming timer', ENTER_DELAY);
   clearTimeout(_enterTimer);
-  _enterTimer=setTimeout(function(){ if(!_interacted) showMascot(); }, ENTER_DELAY);
+  // First-launch entrance fires on a fixed delay. The mascot is non-modal (corner,
+  // blocks nothing), so it's safe to appear while the user clicks around.
+  _enterTimer=setTimeout(function(){ showMascot(); }, ENTER_DELAY);
 }
 function noteInteraction(){
   _interacted=true;
-  // if entrance hasn't fired, re-arm after a short idle gap so we don't interrupt
-  if(!_mascotVisible && mascotEligible()){
-    clearTimeout(_enterTimer);
-    _enterTimer=setTimeout(function(){ showMascot(); }, 3000);
-  }
+  // Interaction only matters for the idle reminder below.
   resetIdle();
 }
 function resetIdle(){
@@ -1313,7 +1316,7 @@ function mascotSnooze(){
   saveOnb();
   hideMascot();
 }
-// Completed tour (reached "Got it") → farewell thumbs-up, fade, permanent dismiss
+// Completed tour (reached "Got it") → thumbs-up, stay visible, permanent dismiss
 function mascotTourCompleted(){
   _onb.seen=true;
   _onb.version=ONBOARDING_VERSION;
@@ -1322,7 +1325,8 @@ function mascotTourCompleted(){
   if(_mascotVisible){
     var g=document.getElementById('mascot-grp');
     g.classList.add('thumbs');
-    setTimeout(function(){ hideMascot(); }, 500);
+    // thumbs-up flash, then stay visible but mark as completed
+    setTimeout(function(){ g.classList.add('completed'); }, 500);
   }
 }
 function initMascot(){
@@ -1336,7 +1340,25 @@ function initMascot(){
 // PWA
 function injectPWA(){var m={name:'Adroit Site Audit',short_name:'Adroit',display:'standalone',theme_color:'#ffffff',background_color:'#f4f6fa',start_url:'./'};var blob=new Blob([JSON.stringify(m)],{type:'application/manifest+json'});var lk=document.createElement('link');lk.rel='manifest';lk.href=URL.createObjectURL(blob);document.head.appendChild(lk);}
 
-async function init(){injectPWA();await initDB();await loadDB();await loadOnb();renderHome();setInterval(updSync,60000);initMascot();}
+async function init(){
+  try{
+    console.log('[init] starting');
+    injectPWA();
+    await initDB();
+    console.log('[init] db loaded');
+    await loadDB();
+    console.log('[init] projects loaded');
+    await loadOnb();
+    console.log('[init] onboarding state loaded', _onb);
+    renderHome();
+    console.log('[init] home rendered');
+    setInterval(updSync,60000);
+    initMascot();
+    console.log('[init] mascot initialized');
+  }catch(e){
+    console.error('[init] error:', e.message, e);
+  }
+}
 init();
 </script>
 </body>
