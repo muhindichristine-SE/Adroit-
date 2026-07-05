@@ -154,6 +154,16 @@ textarea.inp{resize:vertical;}
 #pm.active{display:flex;}
 #pm img{max-width:96vw;max-height:92vh;border-radius:8px;}
 #pm-close{position:absolute;top:16px;right:16px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;}
+/* PDF preview modal */
+#pdf-preview-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:2500;flex-direction:column;align-items:center;justify-content:center;}
+#pdf-preview-modal.active{display:flex;}
+#pdf-preview-wrap{position:relative;width:100%;max-width:600px;height:80vh;background:#f4f6fa;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;}
+#pdf-preview-canvas{flex:1;background:#fff;}
+#pdf-preview-footer{background:var(--navy);color:#fff;padding:12px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;}
+.pdf-btn{padding:8px 14px;border-radius:7px;border:none;font-size:12px;font-weight:700;cursor:pointer;color:#fff;}
+.pdf-btn-download{background:var(--crimson);}
+.pdf-btn-email{background:#16a34a;}
+.pdf-btn-cancel{background:rgba(255,255,255,.2);}
 .empty{text-align:center;padding:50px 20px;}
 .empty-ico{font-size:46px;margin-bottom:12px;}
 .empty-t{font-weight:700;color:var(--navy);font-size:15px;margin-bottom:5px;}
@@ -190,8 +200,12 @@ textarea.inp{resize:vertical;}
     <div class="stats">
       <div class="stat-box"><div class="stat-num" id="st-proj">0</div><div class="stat-lbl">Projects</div></div>
       <div class="stat-box"><div class="stat-num orange" id="st-find">0</div><div class="stat-lbl">Findings</div></div>
-      <div class="stat-box"><div class="stat-num green">B</div><div class="stat-lbl">Site Audit</div></div>
+      <div class="stat-box" id="stat-online" style="cursor:pointer;position:relative;" onclick="toggleOnlineInfo()">
+        <div class="stat-num" id="online-dot" style="font-size:32px;line-height:1;">●</div>
+        <div class="stat-lbl" id="online-lbl">Online</div>
+      </div>
     </div>
+    <button class="btn btn-p btn-block" id="install-btn" style="display:none;margin-top:8px;" onclick="promptInstall()">📲 Add to Home Screen</button>
     <button class="btn btn-p btn-block" onclick="openProjForm(-1)">New Site Audit</button>
     <div class="divider"></div>
   </div>
@@ -257,8 +271,8 @@ textarea.inp{resize:vertical;}
   <div id="tc-issues">
     <div class="act-row">
       <button class="btn btn-p btn-sm" onclick="openIssueForm(-1)">+ Add Issue</button>
-      <button class="btn btn-s btn-sm" onclick="exportPDF()">Export PDF</button>
-      <button class="btn btn-o btn-sm" onclick="exportWord()">Export Word</button>
+      <button class="btn btn-s btn-sm" onclick="previewAndExportPDF()">Export PDF</button>
+      <button class="btn btn-o btn-sm" onclick="emailPDF()">📧 Email PDF</button>
     </div>
     <div class="act-row" style="padding:8px 14px;gap:8px;">
       <button class="btn btn-o btn-sm" id="sel-btn" onclick="toggleBulk()">Select</button>
@@ -334,11 +348,12 @@ textarea.inp{resize:vertical;}
         <option value="Quantity Surveyor"><option value="Site Supervisor"><option value="Client">
       </datalist>
     </div>
-    <div class="fg"><label class="lbl">Photo</label>
+    <div class="fg"><label class="lbl">Photo <span style="color:var(--muted);font-weight:400;font-size:11px;">(optional)</span></label>
       <div style="display:flex;gap:8px;margin-bottom:8px;">
         <button type="button" class="btn btn-o btn-block btn-sm" onclick="document.getElementById('ph-cam').click()">&#128247; Take Photo</button>
         <button type="button" class="btn btn-o btn-block btn-sm" onclick="document.getElementById('ph-gal').click()">&#128444; Upload</button>
       </div>
+      <button type="button" class="btn btn-o btn-block btn-sm" style="color:var(--muted);border-color:var(--muted);" onclick="saveIssue()">Continue without photo</button>
       <input type="file" id="ph-cam" accept="image/*" capture="environment" style="display:none;" onchange="handlePhoto(event)">
       <input type="file" id="ph-gal" accept="image/*" style="display:none;" onchange="handlePhoto(event)">
       <div id="ph-prev-wrap" style="display:none;">
@@ -399,6 +414,17 @@ textarea.inp{resize:vertical;}
 </div>
 
 <div id="pm" onclick="this.classList.remove('active')"><button id="pm-close" onclick="document.getElementById('pm').classList.remove('active')">&#10005;</button><img id="pm-img" src="" alt=""></div>
+<div id="pdf-preview-modal" onclick="if(event.target===this) closePDFPreview()">
+  <div id="pdf-preview-wrap">
+    <canvas id="pdf-preview-canvas"></canvas>
+    <div id="pdf-preview-footer">
+      <span id="pdf-page-info" style="flex:1;text-align:center;font-size:11px;">Page 1 of ?</span>
+      <button class="pdf-btn pdf-btn-download" onclick="confirmPDFDownload()">✓ Download</button>
+      <button class="pdf-btn pdf-btn-email" onclick="confirmPDFEmail()">📧 Email</button>
+      <button class="pdf-btn pdf-btn-cancel" onclick="closePDFPreview()">Cancel</button>
+    </div>
+  </div>
+</div>
 <div id="mascot-grp" onclick="mascotTap()" role="button" aria-label="Take a quick tour">
   <div class="mascot-bubble"><span class="mascot-hat">&#128119;</span><span>Need a quick tour?</span></div>
   <svg id="mascot-svg" viewBox="0 0 52 66" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -1337,6 +1363,191 @@ function initMascot(){
   resetIdle();
 }
 
+// ── Online/Offline Status ─────────────────────────────────
+var _deferredPrompt=null;
+function updateOnlineStatus(){
+  var isOnline=navigator.onLine;
+  var dot=document.getElementById('online-dot');
+  var lbl=document.getElementById('online-lbl');
+  if(!dot||!lbl) return;
+  dot.style.color=isOnline?'#22c55e':'#ef4444';
+  lbl.textContent=isOnline?'Online':'Offline';
+}
+function toggleOnlineInfo(){
+  var msg=navigator.onLine?'Connected to internet':'No internet connection - app works offline';
+  toast(msg);
+}
+window.addEventListener('online',updateOnlineStatus);
+window.addEventListener('offline',updateOnlineStatus);
+
+// ── PWA Install Prompt ────────────────────────────────────
+window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault();
+  _deferredPrompt=e;
+  var btn=document.getElementById('install-btn');
+  if(btn) btn.style.display='block';
+});
+window.addEventListener('appinstalled',function(){
+  _deferredPrompt=null;
+  var btn=document.getElementById('install-btn');
+  if(btn) btn.style.display='none';
+  toast('App installed! Add to home screen anytime from the menu.');
+});
+function promptInstall(){
+  if(!_deferredPrompt) return;
+  _deferredPrompt.prompt();
+  _deferredPrompt.userChoice.then(function(choice){
+    if(choice.outcome==='accepted'){ _deferredPrompt=null; }
+  });
+}
+
+// ── PDF Preview & Email ───────────────────────────────────
+var _pdfBlob=null;
+function previewAndExportPDF(){
+  toast('Generating PDF...',7000);
+  setTimeout(function(){ exportPDFForPreview(); }, 80);
+}
+function exportPDFForPreview(){
+  if(!window.jspdf||!window.jspdf.jsPDF){ toast('PDF library not loaded',4000); return; }
+  try{
+    var p=S.projects[S.proj];
+    var doc=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+    var W=210,H=297;
+    var NV=[26,42,94],CR=[139,28,28],WH=[255,255,255];
+    var BG=[249,248,245];
+    doc.setFillColor(BG[0],BG[1],BG[2]);doc.rect(0,0,W,H,'F');
+    doc.setFillColor(NV[0],NV[1],NV[2]);doc.rect(0,0,10.5,H,'F');
+    doc.setFillColor(CR[0],CR[1],CR[2]);doc.rect(0,13,5.8,0.7,'F');
+    doc.setFillColor(CR[0],CR[1],CR[2]);doc.rect(3.75,275,3,3,'F');
+    doc.setFontSize(4);doc.setFont(undefined,'normal');doc.setTextColor(255,255,255);
+    doc.text('ADR · '+(p.reference||'REF')+' · '+(p.date||'2026'),5.25,240,{angle:90,align:'center'});
+    doc.setFillColor(CR[0],CR[1],CR[2]);doc.rect(10.5,0,W-10.5,0.8,'F');
+    doc.setFillColor(232,232,236);
+    var BX=20,BY=20;
+    doc.setFillColor(CR[0],CR[1],CR[2]);doc.rect(BX,BY,5,5,'F');
+    doc.setFontSize(6.5);doc.setFont(undefined,'bold');doc.setTextColor(NV[0],NV[1],NV[2]);
+    doc.text('ADROIT BIM CONSULTANTS LTD',BX+7,BY+3.5);
+    doc.setFontSize(5);doc.setFont(undefined,'normal');doc.setTextColor(NV[0],NV[1],NV[2]);
+    doc.text('Civil  ·  Structural  ·  BIM Engineering',BX+7,BY+7);
+    var HY=85;
+    doc.setFillColor(CR[0],CR[1],CR[2]);doc.rect(BX,HY,8,0.8,'F');
+    doc.setFontSize(5.5);doc.setFont(undefined,'bold');doc.setTextColor(CR[0],CR[1],CR[2]);
+    doc.text('SITE INSPECTION NOTES',BX+10,HY+0.6);
+    doc.setFontSize(24);doc.setFont(undefined,'bold');doc.setTextColor(15,26,62);
+    var titleLines=doc.splitTextToSize(p.name||'Report',W-BX-20);
+    doc.text(titleLines,BX,HY+14);
+    var metaFields=[[' CLIENT',p.client],['CONTRACTOR',p.contractor],['ENGINEER',p.engineer],['DRAWN BY',p.drawnBy]];
+    var mgY=200;
+    metaFields.forEach(function(f){
+      doc.setFontSize(5);doc.setFont(undefined,'bold');doc.setTextColor(CR[0],CR[1],CR[2]);
+      doc.text(f[0],BX,mgY);
+      doc.setFontSize(6.5);doc.setFont(undefined,'normal');doc.setTextColor(NV[0],NV[1],NV[2]);
+      doc.text(f[1]||'--',BX,mgY+5);
+      mgY+=13;
+    });
+    var issues=p.issues||[];
+    if(issues.length){
+      doc.addPage();
+      doc.setFillColor(NV[0],NV[1],NV[2]);doc.rect(0,0,W,18,'F');
+      doc.setFillColor(CR[0],CR[1],CR[2]);doc.rect(0,0,W,1.2,'F');
+      doc.setFontSize(10);doc.setTextColor(WH[0],WH[1],WH[2]);doc.setFont(undefined,'bold');
+      doc.text('ISSUES',15,12);
+      var y=25;
+      issues.forEach(function(iss,i){
+        if(y>H-20) {doc.addPage();y=25;}
+        doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(NV[0],NV[1],NV[2]);
+        doc.text((iss.title||'').toUpperCase(),15,y+6);
+        doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(50,50,70);
+        if(iss.description) doc.text(iss.description,15,y+14,{maxWidth:W-30});
+        doc.setFontSize(7);doc.setTextColor(NV[0],NV[1],NV[2]);
+        doc.text((iss.severity||'Minor')+' | '+( iss.status||'Open'),15,y+30);
+        y+=40;
+      });
+    }
+    _pdfBlob=doc.output('blob');
+    showPDFPreview(_pdfBlob);
+  }catch(e){ toast('PDF error: '+e.message,5000); }
+}
+function showPDFPreview(blob){
+  var url=URL.createObjectURL(blob);
+  var modal=document.getElementById('pdf-preview-modal');
+  modal.classList.add('active');
+  var iframe=document.createElement('iframe');
+  iframe.src=url;
+  iframe.style.cssText='width:100%;height:100%;border:none;';
+  var canvas=document.getElementById('pdf-preview-canvas');
+  canvas.parentNode.replaceChild(iframe,canvas);
+  document.getElementById('pdf-page-info').textContent='PDF preview ready';
+}
+function closePDFPreview(){
+  document.getElementById('pdf-preview-modal').classList.remove('active');
+  _pdfBlob=null;
+}
+function confirmPDFDownload(){
+  if(_pdfBlob){
+    var url=URL.createObjectURL(_pdfBlob);
+    var a=document.createElement('a');
+    a.href=url;
+    a.download=(S.projects[S.proj].name||'Report').replace(/[^a-z0-9]/gi,'-').slice(0,40)+'-Inspection-Report.pdf';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('PDF downloaded!');
+    closePDFPreview();
+  }
+}
+function confirmPDFEmail(){
+  if(_pdfBlob){
+    sharePDFWithMessage(_pdfBlob);
+    closePDFPreview();
+  }
+}
+function emailPDF(){
+  toast('Generating PDF for sharing...',6000);
+  setTimeout(function(){ 
+    if(!window.jspdf||!window.jspdf.jsPDF){ toast('PDF library not loaded',4000); return; }
+    exportPDFForPreview();
+    setTimeout(function(){ if(_pdfBlob) sharePDFWithMessage(_pdfBlob); },2000);
+  },100);
+}
+function sharePDFWithMessage(blob){
+  var p=S.projects[S.proj];
+  var iss=p.issues||[];
+  var bStat={Open:0,'In Progress':0,Closed:0},bSev={Critical:0,Major:0,Minor:0};
+  iss.forEach(function(i){ bStat[i.status]=(bStat[i.status]||0)+1; bSev[i.severity]=(bSev[i.severity]||0)+1; });
+  
+  var msg='Site Inspection Report — '+esc(p.name)+'\n\n';
+  msg+='📍 Location: '+(p.location||'--')+' | 📅 Date: '+(p.date||'--')+'\n';
+  msg+='👤 Client: '+(p.client||'--')+'\n\n';
+  msg+='📋 Issues Found: '+iss.length+'\n';
+  msg+='  🔴 Critical: '+bSev.Critical+' | 🟠 Major: '+bSev.Major+' | 🟡 Minor: '+bSev.Minor+'\n';
+  msg+='  Status: '+bStat.Open+' Open | '+bStat['In Progress']+' In Progress | '+bStat.Closed+' Closed\n\n';
+  msg+='Report attached.\n\n';
+  msg+='— Adroit Site Audit';
+  
+  var fileName=(p.name||'Report').replace(/[^a-z0-9]/gi,'-').slice(0,40)+'-Inspection-Report.pdf';
+  
+  // Try Web Share API (modern approach)
+  if(navigator.share){
+    var file=new File([blob],fileName,{type:'application/pdf'});
+    navigator.share({
+      title:'Site Inspection Report',
+      text:msg,
+      files:[file]
+    }).catch(function(e){
+      if(e.name!=='AbortError') toast('Share failed: '+e.message);
+    });
+  }else{
+    // Fallback for older browsers: download + open email
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url;
+    a.download=fileName;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('PDF downloaded. Open your email app and attach it manually.');
+  }
+}
+
 // PWA
 function injectPWA(){var m={name:'Adroit Site Audit',short_name:'Adroit',display:'standalone',theme_color:'#ffffff',background_color:'#f4f6fa',start_url:'./'};var blob=new Blob([JSON.stringify(m)],{type:'application/manifest+json'});var lk=document.createElement('link');lk.rel='manifest';lk.href=URL.createObjectURL(blob);document.head.appendChild(lk);}
 
@@ -1352,6 +1563,7 @@ async function init(){
     console.log('[init] onboarding state loaded', _onb);
     renderHome();
     console.log('[init] home rendered');
+    updateOnlineStatus();
     setInterval(updSync,60000);
     initMascot();
     console.log('[init] mascot initialized');
