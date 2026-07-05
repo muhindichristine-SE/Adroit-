@@ -191,7 +191,7 @@ textarea.inp{resize:vertical;}
 <!-- HOME -->
 <div id="s-home" class="screen active">
   <div class="hdr">
-    <div class="sync-pill"><div class="sync-dot saved" id="sd1"></div><span id="sl1">Saved</span></div>
+    <div class="sync-pill"><div class="sync-dot saved" id="sd1"></div><span id="sl1">Saved</span><button class="btn btn-p btn-sm" id="install-btn" style="margin-left:8px;" onclick="promptInstall()">📲 Install</button></div>
     <div class="logo"><div class="logo-icon">A</div><div class="logo-text">Adroit</div></div>
   </div>
   <div class="page-hero">
@@ -205,7 +205,6 @@ textarea.inp{resize:vertical;}
         <div class="stat-lbl" id="online-lbl">Online</div>
       </div>
     </div>
-    <button class="btn btn-p btn-block" id="install-btn" style="display:none;margin-top:8px;" onclick="promptInstall()">📲 Add to Home Screen</button>
     <button class="btn btn-p btn-block" onclick="openProjForm(-1)">New Site Audit</button>
     <div class="divider"></div>
   </div>
@@ -1257,7 +1256,7 @@ function updHelp(){
 
 // ── Mascot onboarding helper ─────────────────────────────
 // Bump ONBOARDING_VERSION when the walkthrough changes to re-trigger the mascot once.
-var ONBOARDING_VERSION = 1;
+var ONBOARDING_VERSION = 2;
 var SNOOZE_MS = 7*24*60*60*1000;   // 7 days
 var IDLE_MS = 60000;               // idle reminder threshold
 var ENTER_DELAY = 1800;            // first-launch delay
@@ -1269,7 +1268,14 @@ function loadOnb(){
     try{
       var tx=db.transaction('kv','readonly');
       var rq=tx.objectStore('kv').get('onboarding');
-      rq.onsuccess=function(e){ try{ var v=JSON.parse(e.target.result); if(v) _onb=Object.assign(_onb,v); }catch(x){} res(); };
+      rq.onsuccess=function(e){ 
+        try{ 
+          var v=JSON.parse(e.target.result); 
+          if(v && v.version===ONBOARDING_VERSION) _onb=Object.assign(_onb,v);
+          else _onb={seen:false, dismissedAt:0, version:0, remindedThisSession:false};
+        }catch(x){ _onb={seen:false, dismissedAt:0, version:0, remindedThisSession:false}; } 
+        res(); 
+      };
       rq.onerror=function(){ res(); };
     }catch(x){ res(); }
   });
@@ -1469,15 +1475,30 @@ function exportPDFForPreview(){
   }catch(e){ toast('PDF error: '+e.message,5000); }
 }
 function showPDFPreview(blob){
-  var url=URL.createObjectURL(blob);
   var modal=document.getElementById('pdf-preview-modal');
-  modal.classList.add('active');
-  var iframe=document.createElement('iframe');
-  iframe.src=url;
-  iframe.style.cssText='width:100%;height:100%;border:none;';
   var canvas=document.getElementById('pdf-preview-canvas');
-  canvas.parentNode.replaceChild(iframe,canvas);
-  document.getElementById('pdf-page-info').textContent='PDF preview ready';
+  
+  // Calculate file size
+  var sizeMB=(blob.size/1024/1024).toFixed(1);
+  var sizeKB=Math.round(blob.size/1024);
+  var sizeStr=sizeMB > 0.5 ? sizeMB+'MB' : sizeKB+'KB';
+  
+  // Show simple preview modal instead of rendering PDF
+  var p=S.projects[S.proj];
+  var issCount=(p.issues||[]).length;
+  
+  canvas.parentNode.innerHTML='<div style="padding:20px;text-align:center;color:var(--navy);flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
+    +'<div style="font-size:48px;margin-bottom:12px;">📄</div>'
+    +'<div style="font-size:16px;font-weight:700;margin-bottom:8px;">PDF Ready</div>'
+    +'<div style="font-size:13px;color:var(--muted);line-height:1.6;">'
+    +'<div>Project: '+esc(p.name||'Report')+'</div>'
+    +'<div>Issues: '+issCount+'</div>'
+    +'<div>Size: '+sizeStr+'</div>'
+    +'</div>'
+    +'</div>';
+  
+  document.getElementById('pdf-page-info').textContent='Ready to download or share';
+  modal.classList.add('active');
 }
 function closePDFPreview(){
   document.getElementById('pdf-preview-modal').classList.remove('active');
@@ -1497,8 +1518,9 @@ function confirmPDFDownload(){
 }
 function confirmPDFEmail(){
   if(_pdfBlob){
+    toast('Opening share options...');
     sharePDFWithMessage(_pdfBlob);
-    closePDFPreview();
+    setTimeout(function(){ closePDFPreview(); }, 1000);
   }
 }
 function emailPDF(){
@@ -1526,25 +1548,46 @@ function sharePDFWithMessage(blob){
   
   var fileName=(p.name||'Report').replace(/[^a-z0-9]/gi,'-').slice(0,40)+'-Inspection-Report.pdf';
   
-  // Try Web Share API (modern approach)
-  if(navigator.share){
-    var file=new File([blob],fileName,{type:'application/pdf'});
+  // Try Web Share API with file support
+  if(navigator.share && navigator.canShare){
+    try{
+      var file=new File([blob],fileName,{type:'application/pdf'});
+      var shareData={
+        title:'Site Inspection Report',
+        text:msg,
+        files:[file]
+      };
+      // Check if device can share files
+      if(navigator.canShare(shareData)){
+        navigator.share(shareData).catch(function(e){
+          if(e.name!=='AbortError') console.log('Share cancelled');
+        });
+      }else{
+        // Fallback: try without files (older Android)
+        navigator.share({title:'Site Inspection Report',text:msg}).catch(function(e){
+          if(e.name!=='AbortError') toast('Share not supported on this device');
+        });
+      }
+    }catch(e){
+      console.log('Share error:',e);
+    }
+  }else if(navigator.share){
+    // Fallback: older browsers with share but no file support
     navigator.share({
       title:'Site Inspection Report',
-      text:msg,
-      files:[file]
+      text:msg+'\n\n[PDF attached to email]'
     }).catch(function(e){
-      if(e.name!=='AbortError') toast('Share failed: '+e.message);
+      if(e.name!=='AbortError') toast('Share not supported');
     });
   }else{
-    // Fallback for older browsers: download + open email
+    // Final fallback: download + manual email
     var url=URL.createObjectURL(blob);
     var a=document.createElement('a');
     a.href=url;
     a.download=fileName;
     document.body.appendChild(a);a.click();document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast('PDF downloaded. Open your email app and attach it manually.');
+    toast('PDF downloaded. Attach to email manually.');
   }
 }
 
