@@ -1405,23 +1405,35 @@ window.addEventListener('offline',updateOnlineStatus);
 
 // ── PWA Install Prompt ────────────────────────────────────
 window.addEventListener('beforeinstallprompt',function(e){
+  console.log('[beforeinstallprompt] event fired');
   e.preventDefault();
   _deferredPrompt=e;
   var btn=document.getElementById('install-btn');
-  if(btn) btn.style.display='block';
+  if(btn) {
+    btn.style.display='inline-block';
+    console.log('[install-btn] visible');
+  }
 });
 window.addEventListener('appinstalled',function(){
+  console.log('[appinstalled] app installed');
   _deferredPrompt=null;
   var btn=document.getElementById('install-btn');
   if(btn) btn.style.display='none';
-  toast('App installed! Add to home screen anytime from the menu.');
+  toast('App installed!');
 });
 function promptInstall(){
-  if(!_deferredPrompt) return;
-  _deferredPrompt.prompt();
-  _deferredPrompt.userChoice.then(function(choice){
-    if(choice.outcome==='accepted'){ _deferredPrompt=null; }
-  });
+  console.log('[promptInstall] called, deferredPrompt available:', !!_deferredPrompt);
+  if(_deferredPrompt){
+    _deferredPrompt.prompt();
+    _deferredPrompt.userChoice.then(function(choice){
+      console.log('[promptInstall] outcome:', choice.outcome);
+      if(choice.outcome==='accepted'){ _deferredPrompt=null; }
+    }).catch(function(err){
+      console.log('[promptInstall] error:', err);
+    });
+  }else{
+    toast('Install from your browser menu: ⋮ > Install app',5000);
+  }
 }
 
 // ── PDF Preview & Email ───────────────────────────────────
@@ -1493,30 +1505,50 @@ function exportPDFForPreview(){
 }
 function showPDFPreview(blob){
   var modal=document.getElementById('pdf-preview-modal');
+  var canvas=document.getElementById('pdf-preview-canvas');
   
-  // Calculate file size
-  var sizeMB=(blob.size/1024/1024).toFixed(1);
-  var sizeKB=Math.round(blob.size/1024);
-  var sizeStr=sizeMB > 0.5 ? sizeMB+'MB' : sizeKB+'KB';
-  
-  // Show simple preview modal
-  var p=S.projects[S.proj];
-  var issCount=(p.issues||[]).length;
-  
-  var previewHTML='<div style="padding:20px;text-align:center;color:var(--navy);flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">'
-    +'<div style="font-size:48px;margin-bottom:12px;">📄</div>'
-    +'<div style="font-size:16px;font-weight:700;margin-bottom:8px;">PDF Ready</div>'
-    +'<div style="font-size:13px;color:var(--muted);line-height:1.6;">'
-    +'<div>Project: '+esc(p.name||'Report')+'</div>'
-    +'<div>Issues: '+issCount+'</div>'
-    +'<div>Size: '+sizeStr+'</div>'
-    +'</div>'
-    +'</div>';
-  
-  var wrap=document.getElementById('pdf-preview-wrap');
-  if(wrap) wrap.innerHTML=previewHTML+'<div id="pdf-preview-footer" style="background:var(--navy);color:#fff;padding:12px;display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;"><span style="flex:1;text-align:center;font-size:11px;">Ready to download</span><button class="pdf-btn pdf-btn-download" onclick="confirmPDFDownload()" style="padding:8px 14px;border-radius:7px;border:none;background:#A51C30;color:#fff;font-size:12px;font-weight:700;cursor:pointer;">✓ Download</button><button class="pdf-btn pdf-btn-cancel" onclick="closePDFPreview()" style="padding:8px 14px;border-radius:7px;border:none;background:rgba(255,255,255,.2);color:#fff;font-size:12px;font-weight:700;cursor:pointer;">Cancel</button></div>';
-  
-  modal.classList.add('active');
+  // Load PDF.js library with worker
+  if(!window.pdfjsLib){
+    var script=document.createElement('script');
+    script.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload=function(){
+      // Set worker
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      renderPDF(blob, canvas, modal);
+    };
+    document.head.appendChild(script);
+  }else{
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    renderPDF(blob, canvas, modal);
+  }
+}
+
+function renderPDF(blob, canvas, modal){
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var pdf=window.pdfjsLib.getDocument(new Uint8Array(e.target.result));
+    pdf.promise.then(function(pdfDoc){
+      console.log('[PDF] pages:', pdfDoc.numPages);
+      // Render first page
+      pdfDoc.getPage(1).then(function(page){
+        var ctx=canvas.getContext('2d');
+        var viewport=page.getViewport({scale:2});
+        canvas.width=viewport.width;
+        canvas.height=viewport.height;
+        var renderCtx={canvasContext:ctx, viewport:viewport};
+        page.render(renderCtx).promise.then(function(){
+          console.log('[PDF] page rendered');
+          modal.classList.add('active');
+          var pageInfo=document.getElementById('pdf-page-info');
+          if(pageInfo) pageInfo.textContent='Page 1 of '+pdfDoc.numPages;
+        });
+      });
+    }).catch(function(err){
+      console.log('[PDF] error:', err);
+      toast('PDF render error: '+err.message);
+    });
+  };
+  reader.readAsArrayBuffer(blob);
 }
 function closePDFPreview(){
   document.getElementById('pdf-preview-modal').classList.remove('active');
