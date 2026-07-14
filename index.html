@@ -1032,30 +1032,34 @@ async function exportPDF() {
         var iss=issues[ii], hasPh=!!iss.photo;
         var sc2=iss.severity==='Critical'?[185,28,28]:iss.severity==='Major'?[245,158,11]:[22,101,52];
 
-        // Calculate row height — photo rows fixed at ROW_H, no-photo rows dynamic full width
-        var rH=ROW_H;
-        if(!hasPh){
-          doc.setFontSize(8);
-          var dl0=iss.description?doc.splitTextToSize(iss.description,CW):[];
-          rH=TITLE_H+ASGN_H+(dl0.length?dl0.length*4.5+6:10)+FOOT_H+6;
-          rH=Math.max(rH,30);
-        }
-        if(y+rH>H-14){addHdr('SITE INSPECTION ISSUES (cont.)');y=25;}
-
-        // Title — full width, bold uppercase
-        doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(NV[0],NV[1],NV[2]);
-        doc.text((iss.title||'UNTITLED ISSUE').toUpperCase(),ML,y+6);
-
-        // Assigned To — grey, directly below title
-        doc.setFontSize(8);doc.setFont(undefined,'italic');doc.setTextColor(150,150,165);
-        doc.text('Assigned To: '+(iss.assignedTo||''),ML,y+TITLE_H+4);
-
-        var contentY=y+TITLE_H+ASGN_H+2;
-
+        // ---- PHOTO ISSUES: fixed row, 2 per page ----
         if(hasPh){
-          // Photo LEFT — fixed size
-          try{doc.addImage(iss.photo,'JPEG',ML,contentY,PH_W,PH_H,undefined,'FAST');}catch(ie){}
-          // Description RIGHT — always at DESC_X
+          var rH=ROW_H;
+          if(y+rH>H-14){addHdr('SITE INSPECTION ISSUES (cont.)');y=25;}
+
+          // Title
+          doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(NV[0],NV[1],NV[2]);
+          doc.text((iss.title||'UNTITLED ISSUE').toUpperCase(),ML,y+6);
+          // Assigned To
+          doc.setFontSize(8);doc.setFont(undefined,'italic');doc.setTextColor(150,150,165);
+          doc.text('Assigned To: '+(iss.assignedTo||''),ML,y+TITLE_H+4);
+
+          var contentY=y+TITLE_H+ASGN_H+2;
+
+          // Photo LEFT — detect format
+          var imgFmt='JPEG';
+          try{
+            var head=(iss.photo||'').substring(0,30).toUpperCase();
+            if(head.indexOf('IMAGE/PNG')>=0) imgFmt='PNG';
+            else if(head.indexOf('IMAGE/WEBP')>=0) imgFmt='WEBP';
+          }catch(fe){}
+          try{
+            doc.addImage(iss.photo,imgFmt,ML,contentY,PH_W,PH_H,undefined,'FAST');
+          }catch(ie){
+            try{ doc.addImage(iss.photo,ML,contentY,PH_W,PH_H); }
+            catch(ie2){ console.log('[PDF] image failed for "'+(iss.title||'')+'":', ie2 && ie2.message); }
+          }
+          // Description RIGHT
           doc.setFont(undefined,'normal');
           if(iss.description){
             doc.setFontSize(8);doc.setTextColor(50,50,70);
@@ -1067,30 +1071,60 @@ async function exportPDF() {
             doc.setFontSize(8);doc.setFont(undefined,'italic');doc.setTextColor(170,170,185);
             doc.text('No description recorded.',DESC_X,contentY+4);
           }
-        }else{
-          // No photo — full width description, no empty column
+          // Footer
+          var fY=y+rH-3;
+          doc.setFontSize(7);doc.setFont(undefined,'bold');
+          doc.setTextColor(sc2[0],sc2[1],sc2[2]);doc.text(iss.severity||'Minor',ML,fY);
+          doc.setFont(undefined,'normal');doc.setTextColor(100,100,120);
+          doc.text('  Status: '+(iss.status||'Open')+' | '+fmtD(iss.createdAt),ML+26,fY);
+          // Separator
+          doc.setDrawColor(200,200,212);doc.setLineWidth(0.4);
+          doc.line(ML,y+rH+2,W-MR,y+rH+2);
+          y+=rH+4;
+
+        } else {
+          // ---- TEXT-ONLY ISSUES: flow naturally, break pages as needed ----
+          var LH=4.5;      // line height
+          // Ensure room for at least the title + assigned + a couple lines
+          if(y+TITLE_H+ASGN_H+16>H-14){ addHdr('SITE INSPECTION ISSUES (cont.)'); y=25; }
+
+          // Title
+          doc.setFontSize(11);doc.setFont(undefined,'bold');doc.setTextColor(NV[0],NV[1],NV[2]);
+          doc.text((iss.title||'UNTITLED ISSUE').toUpperCase(),ML,y+6);
+          // Assigned To
+          doc.setFontSize(8);doc.setFont(undefined,'italic');doc.setTextColor(150,150,165);
+          doc.text('Assigned To: '+(iss.assignedTo||''),ML,y+TITLE_H+4);
+
+          var ty=y+TITLE_H+ASGN_H+4;   // running Y for description text
+
           doc.setFont(undefined,'normal');
           if(iss.description){
             doc.setFontSize(8);doc.setTextColor(50,50,70);
-            var dl2=doc.splitTextToSize(iss.description,CW);
-            justifyText(doc,dl2,ML,contentY+2,4.5,CW);
+            var lines=doc.splitTextToSize(iss.description,CW);
+            for(var li=0; li<lines.length; li++){
+              // page break mid-description if needed
+              if(ty>H-22){ addHdr('SITE INSPECTION ISSUES (cont.)'); ty=25; }
+              doc.text(lines[li],ML,ty);
+              ty+=LH;
+            }
           }else{
             doc.setFontSize(8);doc.setFont(undefined,'italic');doc.setTextColor(170,170,185);
-            doc.text('No description recorded.',ML,contentY+2);
+            doc.text('No description recorded.',ML,ty);
+            ty+=LH;
           }
+
+          // Footer directly below actual text end
+          ty+=4;
+          if(ty>H-16){ addHdr('SITE INSPECTION ISSUES (cont.)'); ty=25; }
+          doc.setFontSize(7);doc.setFont(undefined,'bold');
+          doc.setTextColor(sc2[0],sc2[1],sc2[2]);doc.text(iss.severity||'Minor',ML,ty);
+          doc.setFont(undefined,'normal');doc.setTextColor(100,100,120);
+          doc.text('  Status: '+(iss.status||'Open')+' | '+fmtD(iss.createdAt),ML+26,ty);
+          // Separator
+          doc.setDrawColor(200,200,212);doc.setLineWidth(0.4);
+          doc.line(ML,ty+3,W-MR,ty+3);
+          y=ty+7;
         }
-
-        // Footer — severity | status | date
-        var fY=y+rH-3;
-        doc.setFontSize(7);doc.setFont(undefined,'bold');
-        doc.setTextColor(sc2[0],sc2[1],sc2[2]);doc.text(iss.severity||'Minor',ML,fY);
-        doc.setFont(undefined,'normal');doc.setTextColor(100,100,120);
-        doc.text('  Status: '+(iss.status||'Open')+' | '+fmtD(iss.createdAt),ML+26,fY);
-
-        // Separator
-        doc.setDrawColor(200,200,212);doc.setLineWidth(0.4);
-        doc.line(ML,y+rH+2,W-MR,y+rH+2);
-        y+=rH+4;
       }
 
       var pc=doc.internal.getNumberOfPages();
